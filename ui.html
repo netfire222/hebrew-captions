@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>כתוביות בעברית</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#111009;--card:#1a1710;--card2:#221f16;--bd:rgba(196,119,90,.25);
+        --tx:#f0ebe3;--mut:#9e9585;--dim:#6b6357;--acc:#c4775a;--acc2:#d4875a}
+  body{background:var(--bg);color:var(--tx);font-family:'Heebo',Arial,sans-serif;
+       display:grid;grid-template-columns:1fr 420px;height:100vh;overflow:hidden}
+
+  /* ── במה ── */
+  #stage{display:flex;align-items:center;justify-content:center;background:#0a0908;
+         position:relative;padding:18px;overflow:hidden}
+  #wrap{position:relative;box-shadow:0 12px 60px rgba(0,0,0,.6);line-height:0}
+  video{display:block;width:100%;height:100%;border-radius:10px;background:#000}
+  #cap{position:absolute;inset:0;overflow:hidden;z-index:5;pointer-events:none}
+  #capInner{position:absolute;text-align:center;transform:translate(-50%,-50%);
+            white-space:normal;pointer-events:auto;cursor:grab;user-select:none}
+  #capInner.drag{cursor:grabbing}
+  #capInner .w{display:inline-block;margin:0 .16em}
+  #guide{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;transition:opacity .15s}
+  #guide.on{opacity:1}
+  #guide i{position:absolute;background:rgba(196,119,90,.5)}
+  #empty{color:var(--mut);text-align:center;font-size:15px;line-height:2}
+
+  /* ── פאנל ── */
+  #panel{background:var(--card);border-right:1px solid var(--bd);overflow-y:auto;padding:18px}
+  h2{font-size:14px;font-weight:800;margin:0 0 10px;color:var(--acc2)}
+  .sec{margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--bd)}
+  .sec:last-child{border:none}
+  button{background:var(--acc);color:#111;border:0;border-radius:7px;padding:10px 16px;
+         font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;width:100%}
+  button:disabled{opacity:.45;cursor:default}
+  input[type=file]{width:100%;font-size:12px;color:var(--mut)}
+  textarea{width:100%;background:var(--card2);border:1px solid var(--bd);border-radius:7px;
+           color:var(--tx);font-family:inherit;font-size:13px;padding:10px;min-height:100px;resize:vertical}
+  label{display:block;font-size:12px;color:var(--mut);margin:9px 0 4px}
+  select,input[type=number],input[type=text]{width:100%;background:var(--card2);border:1px solid var(--bd);
+           border-radius:7px;color:var(--tx);font-family:inherit;font-size:13px;padding:8px}
+  .saverow{display:flex;gap:7px;margin-top:7px}
+  .saverow input{flex:1}
+  .saverow button{width:auto;flex:none;padding:9px 15px}
+  .pcard .rm{position:absolute;left:6px;top:3px;color:var(--dim);font-size:15px;
+             line-height:1;opacity:0;cursor:pointer}
+  .pcard:hover .rm{opacity:1}
+  .pcard .rm:hover{color:#e08b7a}
+  #themes:empty::after{content:'עדיין לא שמרת ערכה.';color:var(--dim);font-size:11.5px}
+  .modes{display:flex;gap:8px;margin-bottom:8px}
+  .modes button{flex:1}
+  .modes button.off{background:none;border:1px solid var(--bd);color:var(--mut)}
+  .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .pcard{background:var(--card2);border:1px solid var(--bd);border-radius:8px;padding:8px 9px;
+         cursor:pointer;font-size:12px;position:relative}
+  .pcard.on{border-color:var(--acc);background:rgba(196,119,90,.12)}
+  .pcard b{display:block;font-size:12.5px;margin-bottom:2px}
+  .pcard span{color:var(--dim);font-size:10.5px;line-height:1.4}
+
+  /* ── בורר פונטים ── */
+  #fonts{display:flex;flex-direction:column;gap:6px;max-height:210px;overflow-y:auto}
+  .fcard{background:var(--card2);border:1px solid var(--bd);border-radius:8px;padding:8px 11px;
+         cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .fcard.on{border-color:var(--acc);background:rgba(196,119,90,.12)}
+  .fcard .sample{font-size:21px;line-height:1.25;color:var(--tx);white-space:nowrap}
+  .fcard .nm{font-size:10.5px;color:var(--dim);direction:ltr;white-space:nowrap}
+
+  /* ── פקדים ── */
+  .row{display:flex;align-items:center;gap:9px;margin:7px 0}
+  .row .lb{font-size:12px;color:var(--mut);flex:none;width:74px}
+  .row input[type=range]{flex:1;accent-color:var(--acc);height:4px}
+  .row .val{font-size:11px;color:var(--dim);width:38px;text-align:left;direction:ltr;flex:none}
+  .sw{display:flex;align-items:center;gap:7px;flex:1}
+  .sw input[type=color]{width:34px;height:26px;border:1px solid var(--bd);border-radius:6px;
+        background:var(--card2);cursor:pointer;padding:2px}
+  .chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+  .chip{width:20px;height:20px;border-radius:5px;cursor:pointer;border:1px solid rgba(255,255,255,.18)}
+  .tog{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--mut);margin:9px 0 3px}
+  .tog input{width:auto;accent-color:var(--acc)}
+
+  /* ── כתוביות ── */
+  #caps{max-height:210px;overflow-y:auto;font-size:12.5px}
+  .crow{padding:6px 8px;border-bottom:1px solid var(--bd);display:flex;gap:8px;align-items:flex-start}
+  .crow:hover{background:var(--card2)}
+  .crow.on{background:rgba(196,119,90,.14)}
+  .crow .t{color:var(--acc2);flex:none;font-size:11px;padding-top:3px;direction:ltr;cursor:pointer}
+  .crow .x{flex:1;outline:none;border-radius:4px;padding:2px 4px;min-height:1.2em}
+  .crow .x:focus{background:#0a0908;box-shadow:0 0 0 1px var(--acc)}
+  .crow .del{flex:none;color:var(--dim);cursor:pointer;font-size:15px;line-height:1.2;opacity:0}
+  .crow:hover .del{opacity:1}
+  .crow .del:hover{color:#e08b7a}
+
+  .hint{font-size:11px;color:var(--dim);line-height:1.6;margin-top:6px}
+  .msg{font-size:12px;color:var(--mut);margin-top:7px;line-height:1.6}
+  .err{color:#e08b7a}
+  .bar{height:5px;background:var(--card2);border-radius:3px;overflow:hidden;margin-top:8px}
+  .bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .3s}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="empty">העלה סרטון כדי להתחיל<br><span style="font-size:12px">אפשר לגרור את הכתוביות ישירות על הווידאו</span></div>
+  <div id="wrap" style="display:none">
+    <video id="v" controls></video>
+    <div id="guide"><i style="left:50%;top:0;bottom:0;width:1px"></i><i style="top:50%;left:0;right:0;height:1px"></i></div>
+    <div id="cap"><div id="capInner"></div></div>
+  </div>
+</div>
+
+<div id="panel">
+  <div class="sec">
+    <h2>1 · סרטון</h2>
+    <input type="file" id="file" accept="video/*">
+    <div class="msg" id="vmsg"></div>
+  </div>
+
+  <div class="sec">
+    <h2>2 · טקסט</h2>
+    <div class="modes">
+      <button id="mAuto">תמלול אוטומטי</button>
+      <button id="mPaste" class="off">הדבקת טקסט</button>
+    </div>
+    <div id="pasteBox" style="display:none">
+      <textarea id="text" placeholder="הדבק כאן את התסריט המדויק. התזמון יילקח מהאודיו."></textarea>
+    </div>
+    <label>שפת הדובר</label>
+    <select id="lang">
+      <option value="he">עברית</option>
+      <option value="en">אנגלית</option>
+      <option value="auto">זיהוי אוטומטי</option>
+    </select>
+    <div class="hint">אם אתה מדבר אנגלית, אל תשאיר על עברית. whisper כפוי-לעברית מתעתק "Claude Code" לאותיות עבריות.</div>
+    <label class="tog"><input type="checkbox" id="fillers" checked> הסר מילות מילוי (אה, אמ, כאילו)</label>
+    <label>מילים מקסימום בכתובית</label>
+    <input type="number" id="maxw" value="4" min="1" max="8">
+    <button id="run" style="margin-top:11px" disabled>הפק כתוביות</button>
+    <div class="msg" id="tmsg"></div>
+  </div>
+
+  <div class="sec">
+    <h2>3 · נקודת פתיחה</h2>
+    <div class="pgrid" id="presets"></div>
+    <div class="hint">בחירת פריסט מאפסת את כל ההגדרות שמתחת.</div>
+
+    <label style="margin-top:15px">הערכות שלי</label>
+    <div class="pgrid" id="themes"></div>
+    <div class="saverow">
+      <input type="text" id="tname" value="הערכה שלי" placeholder="שם הערכה">
+      <button id="saveTheme">שמור</button>
+    </div>
+    <div class="msg" id="tsmsg"></div>
+    <div class="hint">שומר את כל מה שמוגדר עכשיו: פונט, גודל, מיקום, צבעים, קונטור והצללה. שם שכבר קיים נדרס. הערכות נשמרות לדיסק ונשארות גם אחרי סגירת הכלי.</div>
+  </div>
+
+  <div class="sec">
+    <h2>4 · פונט</h2>
+    <div id="fonts"></div>
+  </div>
+
+  <div class="sec">
+    <h2>5 · גודל ומיקום</h2>
+    <div class="row"><span class="lb">גודל</span>
+      <input type="range" id="sSize" min="2" max="16" step="0.1"><span class="val" id="vSize"></span></div>
+    <div class="row"><span class="lb">אופקי</span>
+      <input type="range" id="sX" min="5" max="95" step="1"><span class="val" id="vX"></span></div>
+    <div class="row"><span class="lb">אנכי</span>
+      <input type="range" id="sY" min="5" max="95" step="1"><span class="val" id="vY"></span></div>
+    <div class="row"><span class="lb">מרווח שורה</span>
+      <input type="range" id="sLH" min="0.9" max="2" step="0.05"><span class="val" id="vLH"></span></div>
+    <div class="row"><span class="lb">הגדלת מילה</span>
+      <input type="range" id="sPop" min="1" max="1.5" step="0.02"><span class="val" id="vPop"></span></div>
+    <button class="sec2" id="reset" style="background:none;border:1px solid var(--bd);color:var(--mut);margin-top:8px">אפס מיקום למרכז תחתון</button>
+    <div class="hint">אפשר גם פשוט לגרור את הכתוביות על הווידאו.</div>
+  </div>
+
+  <div class="sec">
+    <h2>6 · צבעים</h2>
+    <label>צבע טקסט</label>
+    <div class="sw"><input type="color" id="cText"><div class="chips" id="chText"></div></div>
+    <label>צבע המילה הנוכחית</label>
+    <div class="sw"><input type="color" id="cActive"><div class="chips" id="chActive"></div></div>
+
+    <label class="tog"><input type="checkbox" id="tStroke"> קונטור</label>
+    <div id="strokeBox">
+      <div class="sw"><input type="color" id="cStroke"></div>
+      <div class="row"><span class="lb">עובי</span>
+        <input type="range" id="sStroke" min="0" max="1.5" step="0.02"><span class="val" id="vStroke"></span></div>
+    </div>
+
+    <label class="tog"><input type="checkbox" id="tShadow"> הצללה</label>
+    <div id="shadowBox">
+      <div class="sw"><input type="color" id="cShadow"></div>
+      <div class="row"><span class="lb">עוצמה</span>
+        <input type="range" id="sShadow" min="0" max="1" step="0.02"><span class="val" id="vShadow"></span></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>7 · כתוביות</h2>
+    <div id="caps"><div class="msg">עדיין אין. הפק כתוביות קודם.</div></div>
+    <div class="hint">לחיצה על הזמן קופצת לשם. לחיצה על הטקסט פותחת לעריכה, Enter שומר ו-Esc מבטל. × מוחק.</div>
+  </div>
+
+  <div class="sec">
+    <h2>8 · ייצוא</h2>
+    <button id="exp" disabled>ייצא סרטון עם כתוביות צרובות</button>
+    <div class="bar" id="bar" style="display:none"><i></i></div>
+    <div class="msg" id="emsg"></div>
+  </div>
+
+  <div class="sec">
+    <h2>9 · שטח בדיסק</h2>
+    <div class="msg" id="stor">בודק...</div>
+    <div class="modes" style="margin-top:9px">
+      <button id="clnOld">נקה קבצים ישנים</button>
+      <button id="clnAll" class="off">נקה הכל</button>
+    </div>
+    <div class="hint">זה לא קאש. <b>נקה קבצים ישנים</b> משאיר את הסרטון שפתוח כרגע ואת הייצוא האחרון, ומוחק את השאר. <b>נקה הכל</b> מרוקן גם אותם.</div>
+  </div>
+</div>
+
+<script>
+let META=null, CAPS=[], PRESETS={}, FONTS=[], PKEY='pop_yellow', MODE='auto', LAST=-1;
+let THEMES={}, TKEY=null;      // ערכות ששמרת בעצמך, ואיזו מהן פעילה
+// כתובית דוגמה, כדי שאפשר יהיה לעצב לפני שמתמללים
+const SAMPLE={words:['הכלי','הזה','חוסך','30%','מהזמן'],
+              emph:[false,false,false,true,false], sample:true};
+let STYLE={};
+const $=id=>document.getElementById(id);
+const v=$('v'), box=$('capInner');
+
+const SWATCHES=['#FFFFFF','#FFD500','#FF3B30','#34C759','#0A84FF','#FF2D9B',
+                '#00E5FF','#FF9500','#AF52DE','#111009','#C4775A','#F0EBE3'];
+
+// ── טעינה ────────────────────────────────────────────────────────────────
+const UI_BUILD='2026-08-27e';
+
+async function boot(){
+  let p,f;
+  // אזהרה מוקדמת אם השרת רץ עם קוד ישן. זה המקור הנפוץ ביותר
+  // לכך שפקדים חדשים לא מופיעים אחרי רענון דפדפן בלבד.
+  try{
+    const rv=await fetch('/api/version');
+    const {build}=await rv.json();
+    if(build!==UI_BUILD) throw 0;
+  }catch(e){
+    document.getElementById('panel').insertAdjacentHTML('afterbegin',
+      '<div class="sec" style="border:1px solid #e08b7a;border-radius:8px;padding:12px">'
+      +'<div class="msg err" style="margin:0">השרת רץ עם גרסה ישנה של הקוד.<br>'
+      +'סגור את חלון הטרמינל והרץ שוב את <b>start.command</b>, אחרת חלק מהפקדים לא יופיעו.</div></div>');
+  }
+  try{
+    const rp=await fetch('/api/presets');
+    if(!rp.ok) throw new Error('presets '+rp.status);
+    p=await rp.json();
+  }catch(e){
+    $('presets').innerHTML='<div class="msg err">טעינת הפריסטים נכשלה.<br>'
+      +'סגור את חלון הטרמינל והרץ שוב את start.command.</div>';
+    return;
+  }
+  try{
+    const rf=await fetch('/api/fonts');
+    if(!rf.ok) throw new Error('fonts '+rf.status);
+    f=await rf.json();
+  }catch(e){
+    // השרת רץ עם קוד ישן שאין בו את הנתיב הזה
+    $('fonts').innerHTML='<div class="msg err">רשימת הפונטים לא נטענה.<br>'
+      +'השרת רץ עם גרסה ישנה. סגור את חלון הטרמינל והרץ שוב את start.command.</div>';
+    f=[];
+  }
+  PRESETS=p; FONTS=f;
+  injectFontFaces();
+  loadPreset(PKEY);
+  drawPresets(); if(FONTS.length) drawFonts(); drawSwatches();
+  await loadThemes();
+}
+boot();
+
+function faceName(file){ return 'F_'+file.replace(/[^A-Za-z0-9]/g,'_'); }
+
+function injectFontFaces(){
+  const css=FONTS.map(f=>
+    `@font-face{font-family:'${faceName(f.file)}';src:url('/fonts/${f.file}')}`).join('\n');
+  const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
+}
+
+function loadPreset(k){
+  STYLE=JSON.parse(JSON.stringify(PRESETS[k]));
+  TKEY=null;
+  syncControls();
+}
+
+// ── ערכות שמורות ─────────────────────────────────────────────────────────
+async function loadThemes(){
+  try{ THEMES=await (await fetch('/api/themes')).json(); }
+  catch(e){ THEMES={}; }
+  drawThemes();
+}
+
+function drawThemes(){
+  $('themes').innerHTML=Object.keys(THEMES).map(n=>
+    `<div class="pcard ${n===TKEY?'on':''}" data-t="${n}">
+       <span class="rm" data-rm="${n}">×</span>
+       <b>${n}</b><span>${THEMES[n].hint||'ערכה שלך'}</span></div>`).join('');
+
+  $('themes').querySelectorAll('.pcard').forEach(c=>c.onclick=e=>{
+    if(e.target.dataset.rm) return;          // הקליק היה על ×
+    const n=c.dataset.t;
+    STYLE=JSON.parse(JSON.stringify(THEMES[n]));
+    TKEY=n; PKEY=null;
+    syncControls(); drawPresets(); drawThemes(); drawFonts();
+    $('tname').value=n;
+  });
+
+  $('themes').querySelectorAll('.rm').forEach(x=>x.onclick=async e=>{
+    e.stopPropagation();
+    const n=x.dataset.rm;
+    if(!confirm(`למחוק את הערכה "${n}"?`)) return;
+    const j=await (await fetch('/api/themes/delete',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:n})})).json();
+    THEMES=j.themes; if(TKEY===n) TKEY=null;
+    drawThemes();
+  });
+}
+
+async function saveTheme(){
+  const name=$('tname').value.trim();
+  if(!name){ $('tsmsg').innerHTML='<span class="err">צריך שם לערכה.</span>'; return; }
+  const j=await (await fetch('/api/themes',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name,style:STYLE})})).json();
+  if(j.error){ $('tsmsg').innerHTML='<span class="err">'+j.error+'</span>'; return; }
+  THEMES=j.themes; TKEY=name; PKEY=null;
+  drawThemes(); drawPresets();
+  $('tsmsg').innerHTML=`<span style="color:var(--acc2)">`
+    +(j.overwritten?`הערכה "${name}" עודכנה.`:`הערכה "${name}" נשמרה.`)+`</span>`;
+  setTimeout(()=>{$('tsmsg').textContent=''},4000);
+}
+$('saveTheme').onclick=saveTheme;
+$('tname').onkeydown=e=>{ if(e.key==='Enter') saveTheme(); };
+
+// ── ציור פאנלים ──────────────────────────────────────────────────────────
+function drawPresets(){
+  $('presets').innerHTML=Object.entries(PRESETS).map(([k,p])=>
+    `<div class="pcard ${k===PKEY?'on':''}" data-k="${k}"><b>${p.label}</b><span>${p.hint}</span></div>`).join('');
+  $('presets').querySelectorAll('.pcard').forEach(c=>c.onclick=()=>{
+    PKEY=c.dataset.k; loadPreset(PKEY); drawPresets(); drawThemes(); drawFonts();
+  });
+}
+
+function drawFonts(){
+  $('fonts').innerHTML=FONTS.map(f=>
+    `<div class="fcard ${f.file===STYLE.font_file?'on':''}" data-f="${f.file}">
+       <span class="sample" style="font-family:'${faceName(f.file)}'">אבגד 123</span>
+       <span class="nm">${f.label}</span>
+     </div>`).join('');
+  document.querySelectorAll('.fcard').forEach(c=>c.onclick=()=>{
+    STYLE.font_file=c.dataset.f; drawFonts();
+  });
+}
+
+function drawSwatches(){
+  [['chText','cText','color'],['chActive','cActive','active_color']].forEach(([box,inp,key])=>{
+    $(box).innerHTML=SWATCHES.map(c=>`<div class="chip" style="background:${c}" data-c="${c}"></div>`).join('');
+    $(box).querySelectorAll('.chip').forEach(ch=>ch.onclick=()=>{
+      STYLE[key]=ch.dataset.c; $(inp).value=ch.dataset.c;
+    });
+  });
+}
+
+// ── סנכרון פקדים ─────────────────────────────────────────────────────────
+function syncControls(){
+  const set=(id,val,fmt)=>{ $(id).value=val; if(fmt)$(fmt.el).textContent=fmt.t; };
+  $('sSize').value=STYLE.size_pct;      $('vSize').textContent=(+STYLE.size_pct).toFixed(1);
+  $('sX').value=STYLE.x_pct;            $('vX').textContent=STYLE.x_pct;
+  $('sY').value=STYLE.y_pct;            $('vY').textContent=STYLE.y_pct;
+  $('sLH').value=STYLE.line_height;     $('vLH').textContent=(+STYLE.line_height).toFixed(2);
+  $('sPop').value=STYLE.active_scale;   $('vPop').textContent=(+STYLE.active_scale).toFixed(2);
+  $('cText').value=STYLE.color;
+  $('cActive').value=STYLE.active_color;
+  $('tStroke').checked=!!STYLE.stroke_on;
+  $('cStroke').value=STYLE.stroke_color||'#000000';
+  $('sStroke').value=STYLE.stroke_pct||0; $('vStroke').textContent=(+(STYLE.stroke_pct||0)).toFixed(2);
+  $('tShadow').checked=!!STYLE.shadow_on;
+  $('cShadow').value=STYLE.shadow_color||'#000000';
+  $('sShadow').value=STYLE.shadow_opacity||0; $('vShadow').textContent=(+(STYLE.shadow_opacity||0)).toFixed(2);
+  toggleBoxes();
+}
+function toggleBoxes(){
+  $('strokeBox').style.display=$('tStroke').checked?'block':'none';
+  $('shadowBox').style.display=$('tShadow').checked?'block':'none';
+}
+
+function bind(id,key,label,parse){
+  $(id).oninput=()=>{
+    const val=parse?parse($(id).value):$(id).value;
+    STYLE[key]=val;
+    if(label) $(label).textContent = (typeof val==='number' && !Number.isInteger(val))
+      ? val.toFixed(2) : val;
+  };
+}
+bind('sSize','size_pct','vSize',parseFloat);
+bind('sX','x_pct','vX',parseFloat);
+bind('sY','y_pct','vY',parseFloat);
+bind('sLH','line_height','vLH',parseFloat);
+bind('sPop','active_scale','vPop',parseFloat);
+bind('cText','color');
+bind('cActive','active_color');
+bind('cStroke','stroke_color');
+bind('sStroke','stroke_pct','vStroke',parseFloat);
+bind('cShadow','shadow_color');
+bind('sShadow','shadow_opacity','vShadow',parseFloat);
+$('tStroke').onchange=()=>{STYLE.stroke_on=$('tStroke').checked;toggleBoxes()};
+$('tShadow').onchange=()=>{STYLE.shadow_on=$('tShadow').checked;toggleBoxes()};
+$('reset').onclick=()=>{STYLE.x_pct=50;STYLE.y_pct=75;syncControls()};
+
+// ── גרירה על הווידאו ─────────────────────────────────────────────────────
+let dragging=false;
+box.addEventListener('mousedown',e=>{
+  dragging=true; box.classList.add('drag'); $('guide').classList.add('on'); e.preventDefault();
+});
+window.addEventListener('mousemove',e=>{
+  if(!dragging||!META)return;
+  const r=document.getElementById('wrap').getBoundingClientRect();
+  // אחוז מהקצה השמאלי, זהה למה שמנוע הרינדור מצפה לו.
+  STYLE.x_pct=Math.min(95,Math.max(5,((e.clientX-r.left)/r.width)*100));
+  STYLE.y_pct=Math.min(95,Math.max(5,((e.clientY-r.top)/r.height)*100));
+  $('sX').value=STYLE.x_pct; $('vX').textContent=Math.round(STYLE.x_pct);
+  $('sY').value=STYLE.y_pct; $('vY').textContent=Math.round(STYLE.y_pct);
+});
+window.addEventListener('mouseup',()=>{
+  if(dragging){dragging=false;box.classList.remove('drag');$('guide').classList.remove('on')}
+});
+
+// ── מצבים ────────────────────────────────────────────────────────────────
+$('mAuto').onclick=()=>{MODE='auto';$('mAuto').className='';$('mPaste').className='off';$('pasteBox').style.display='none'};
+$('mPaste').onclick=()=>{MODE='paste';$('mPaste').className='';$('mAuto').className='off';$('pasteBox').style.display='block'};
+
+$('file').onchange=async e=>{
+  const f=e.target.files[0]; if(!f)return;
+  $('vmsg').textContent='מעלה...';
+  const fd=new FormData(); fd.append('video',f);
+  const j=await (await fetch('/api/upload',{method:'POST',body:fd})).json();
+  if(j.error){$('vmsg').innerHTML='<span class="err">'+j.error+'</span>';return}
+  META=j; v.src='/media/'+j.file;
+  $('empty').style.display='none'; $('wrap').style.display='block';
+  fitVideo();
+  $('vmsg').textContent=`${j.w}x${j.h} · ${j.dur.toFixed(1)} שניות · ${j.fps.toFixed(0)}fps`;
+  $('run').disabled=false;
+  showStorage();
+};
+
+$('run').onclick=async()=>{
+  $('run').disabled=true; $('tmsg').textContent='מתמלל, זה יכול לקחת דקה או שתיים...';
+  const j=await (await fetch('/api/transcribe',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({file:META.file,mode:MODE,text:$('text').value,
+      max_words:+$('maxw').value,strip_fillers:$('fillers').checked,
+      language:$('lang').value})})).json();
+  $('run').disabled=false;
+  if(j.error){$('tmsg').innerHTML='<span class="err">'+j.error+'</span>';return}
+  CAPS=j.captions;
+  if(CAPS.length) v.currentTime=CAPS[0].s+0.05;
+  $('tmsg').textContent=`${CAPS.length} כתוביות · ${j.words.length} מילים`
+    + (j.detected?` · זוהתה שפה: ${j.detected}`:'')
+    + (j.removed_fillers?` · הוסרו ${j.removed_fillers} מילות מילוי`:'');
+  drawCaps(); $('exp').disabled=false;
+};
+
+// ── רשימת כתוביות ────────────────────────────────────────────────────────
+function drawCaps(){
+  if(!CAPS.length){$('caps').innerHTML='<div class="msg">עדיין אין.</div>';return}
+  $('caps').innerHTML=CAPS.map((c,i)=>
+    `<div class="crow" data-i="${i}">
+       <span class="t" data-seek="${c.s}">${c.s.toFixed(1)}</span>
+       <span class="x" contenteditable="true" spellcheck="false" data-i="${i}">${c.words.join(' ')}</span>
+       <span class="del" data-i="${i}">×</span></div>`).join('');
+  document.querySelectorAll('.crow .t').forEach(el=>el.onclick=()=>v.currentTime=+el.dataset.seek+0.02);
+  document.querySelectorAll('.crow .x').forEach(el=>{
+    el.onkeydown=e=>{
+      if(e.key==='Enter'){e.preventDefault();el.blur()}
+      if(e.key==='Escape'){el.textContent=CAPS[+el.dataset.i].words.join(' ');el.blur()}
+    };
+    el.onblur=()=>applyEdit(+el.dataset.i, el.textContent);
+  });
+  document.querySelectorAll('.crow .del').forEach(el=>el.onclick=()=>{
+    CAPS.splice(+el.dataset.i,1); LAST=-1; drawCaps();
+  });
+}
+
+function applyEdit(i,text){
+  const c=CAPS[i], words=text.trim().split(/\s+/).filter(Boolean);
+  if(!words.length){CAPS.splice(i,1);LAST=-1;drawCaps();return}
+  if(words.join(' ')===c.words.join(' '))return;
+  const span=Math.max(0.12,c.e-c.s);
+  const lens=words.map(w=>Math.max(2,w.length));
+  const total=lens.reduce((a,b)=>a+b,0);
+  let t=c.s; const times=[];
+  words.forEach((w,k)=>{const d=span*lens[k]/total;
+    times.push([+t.toFixed(3),+(t+d).toFixed(3)]);t+=d});
+  const EM=/^(\/[\w-]+|[\w.]*\d[\w.%]*|[A-Za-z][A-Za-z0-9.\-]{1,})$/;
+  c.words=words; c.times=times;
+  c.emph=words.map(w=>EM.test(w.replace(/^[.,!?:;"']+|[.,!?:;"']+$/g,'')));
+  LAST=-1; drawCaps();
+}
+
+// ── התאמת גודל הווידאו לבמה ──────────────────────────────────────────────
+// אלמנט וידאו ללא מידות מפורשות נופל ל-300x150, ואז הכתוביות
+// יוצאות זעירות. מחשבים כאן את הגודל בפועל לפי יחס הממדים.
+function fitVideo(){
+  if(!META) return;
+  const st=document.getElementById('stage');
+  const availW=st.clientWidth-36, availH=st.clientHeight-36;
+  const ar=META.w/META.h;
+  let w=availH*ar, h=availH;
+  if(w>availW){ w=availW; h=availW/ar; }
+  const wrap=document.getElementById('wrap');
+  wrap.style.width=Math.round(w)+'px';
+  wrap.style.height=Math.round(h)+'px';
+}
+window.addEventListener('resize',fitVideo);
+v.addEventListener('loadedmetadata',fitVideo);
+
+// ── תצוגה חיה ────────────────────────────────────────────────────────────
+function tick(){
+  requestAnimationFrame(tick);
+  if(!META||!STYLE.size_pct){box.innerHTML='';return}
+  const t=v.currentTime;
+  let cap=null,ai=null,ci=-1;
+  for(let i=0;i<CAPS.length;i++){
+    const c=CAPS[i];
+    if(t>=c.s&&t<=c.e){cap=c;ci=i;
+      for(let k=0;k<c.times.length;k++)
+        if(t>=c.times[k][0]&&t<=c.times[k][1]){ai=k;break}
+      break}
+  }
+  if(ci!==LAST){
+    LAST=ci;
+    document.querySelectorAll('.crow').forEach(r=>r.classList.toggle('on',+r.dataset.i===ci));
+  }
+  // אין כתובית ברגע הזה? מציגים דוגמה, כדי שהעיצוב תמיד יהיה גלוי.
+  // המילה המודגשת מתחלפת לבד כדי שרואים גם את אפקט ההדגשה.
+  if(!cap){
+    cap=SAMPLE;
+    ai=Math.floor(Date.now()/700)%SAMPLE.words.length;
+  }
+
+  const wrapEl=document.getElementById('wrap');
+  const h=wrapEl.clientHeight||1, w=wrapEl.clientWidth||1;
+  const fs=h*STYLE.size_pct/100;
+  box.style.left=STYLE.x_pct+'%';
+  box.style.top=STYLE.y_pct+'%';
+  box.style.width=(w*0.86)+'px';
+  box.style.fontFamily=`'${faceName(STYLE.font_file)}'`;
+  box.style.fontSize=fs+'px';
+  box.style.lineHeight=STYLE.line_height;
+
+  const sw=fs*(STYLE.stroke_pct||0)/10;
+  const sh=STYLE.shadow||{};
+  box.innerHTML=cap.words.map((word,k)=>{
+    const on=k===ai, em=cap.emph&&cap.emph[k];
+    let st=`color:${(on||em)?STYLE.active_color:STYLE.color};`;
+    st+=`transform:scale(${on?STYLE.active_scale:1});`;
+    if(STYLE.stroke_on) st+=`-webkit-text-stroke:${sw}px ${STYLE.stroke_color};paint-order:stroke fill;`;
+    if(STYLE.shadow_on) st+=`text-shadow:0 ${fs*(sh.dy_pct||.1)}px ${fs*(sh.blur_pct||.3)}px `
+      +`${hexA(STYLE.shadow_color||'#000', STYLE.shadow_opacity)};`;
+    return `<span class="w" style="${st}">${word}</span>`;
+  }).join('');
+
+  if(cap.sample) box.style.opacity='.75'; else box.style.opacity='1';
+  if(STYLE.bg){
+    const b=STYLE.bg;
+    box.innerHTML=`<span style="background:${b.color};border-radius:${fs*b.radius_pct}px;`
+      +`padding:${fs*b.pad_y_pct}px ${fs*b.pad_x_pct}px;`
+      +`box-decoration-break:clone;-webkit-box-decoration-break:clone;">`+box.innerHTML+`</span>`;
+  }
+}
+function hexA(hex,a){
+  const c=hex.replace('#','');
+  return `rgba(${parseInt(c.slice(0,2),16)},${parseInt(c.slice(2,4),16)},${parseInt(c.slice(4,6),16)},${a??.5})`;
+}
+requestAnimationFrame(tick);
+
+// ── ייצוא ────────────────────────────────────────────────────────────────
+$('exp').onclick=async()=>{
+  $('exp').disabled=true; $('bar').style.display='block'; $('emsg').textContent='';
+  const {job}=await (await fetch('/api/export',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({file:META.file,captions:CAPS,style:STYLE})})).json();
+  const iv=setInterval(async()=>{
+    const s=await (await fetch('/api/export/'+job)).json();
+    $('bar').querySelector('i').style.width=(s.pct||0)+'%';
+    $('emsg').textContent=s.stage||'';
+    if(s.done){clearInterval(iv);$('exp').disabled=false;
+      $('emsg').innerHTML = s.error
+        ? '<span class="err">'+s.error+'</span>'
+        : `מוכן. <a href="${s.url}" style="color:var(--acc2)">הורדה</a>`;
+      showStorage()}
+  },800);
+};
+
+// ── ניהול שטח ────────────────────────────────────────────────────────────
+function mb(b){ return b>=1073741824 ? (b/1073741824).toFixed(1)+'GB' : Math.round(b/1048576)+'MB'; }
+
+async function showStorage(){
+  try{
+    const s=await (await fetch('/api/storage')).json();
+    $('stor').innerHTML = s.total_bytes
+      ? `סרטונים שהעלית: ${s.work.n} · ${mb(s.work.bytes)}<br>`
+        +`ייצואים: ${s.output.n} · ${mb(s.output.bytes)}<br>`
+        +`<b>סה"כ ${mb(s.total_bytes)}</b>`
+      : 'ריק, אין מה לנקות.';
+  }catch(e){ $('stor').innerHTML='<span class="err">לא נטען</span>'; }
+}
+
+async function cleanup(scope){
+  const label = scope==='all' ? 'למחוק את כל הסרטונים והייצואים?'
+                              : 'למחוק את כל הקבצים חוץ מהסרטון הפתוח ומהייצוא האחרון?';
+  if(!confirm(label)) return;
+  const j=await (await fetch('/api/cleanup',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({scope,keep:META?META.file:null})})).json();
+  await showStorage();
+  if(j.deleted) $('stor').innerHTML += `<br><span style="color:var(--acc2)">נמחקו ${j.deleted} קבצים, שוחררו ${mb(j.freed)}</span>`;
+  // אם מחקנו את הסרטון שהיה פתוח, מחזירים את המסך למצב התחלתי
+  if(scope==='all'){
+    META=null; CAPS=[]; LAST=-1; v.removeAttribute('src'); v.load();
+    $('wrap').style.display='none'; $('empty').style.display='block';
+    $('run').disabled=true; $('exp').disabled=true; $('file').value='';
+    $('vmsg').textContent=''; drawCaps();
+  }
+}
+$('clnOld').onclick=()=>cleanup('old');
+$('clnAll').onclick=()=>cleanup('all');
+showStorage();
+</script>
+</body>
+</html>
