@@ -1,7 +1,7 @@
 # כתוביות בעברית
 
 כלי מקומי להוספת כתוביות בעברית לסרטונים. תמלול אוטומטי או הדבקת תסריט,
-תצוגה חיה בדפדפן, וייצוא עם כתוביות צרובות.
+תצוגה חיה בדפדפן, וייצוא של סרטון שהכתוביות כבר בתוכו.
 
 הכל רץ על המחשב שלך. בלי מנוי, בלי ענן, בלי להעלות את הסרטונים שלך לשום מקום.
 
@@ -128,7 +128,8 @@ whisper בעברית טועה בשמות מותגים ובמונחי AI. "קלו
 ## English
 
 A local Hebrew subtitle tool. Auto transcription or pasted script, live browser
-preview, burned in captions on export. Runs entirely on your machine, no cloud
+preview, and an export with the captions baked into the video. Runs entirely
+on your own machine, no cloud
 and no subscription.
 
 Generic caption tools break Hebrew when a line mixes numbers or Latin words:

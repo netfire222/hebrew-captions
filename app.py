@@ -314,7 +314,7 @@ def export_job(job, file, captions, style, meta):
             if f % 60 == 0:
                 JOBS[job]["pct"] = int(f / max(1, total) * 70)
 
-        JOBS[job]["stage"] = "צורב לווידאו"
+        JOBS[job]["stage"] = "מטמיע בווידאו"
         JOBS[job]["pct"] = 75
         outname = f"captioned_{job}.mp4"
         outpath = os.path.join(OUT, outname)
