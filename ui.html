@@ -124,6 +124,11 @@
     <div id="pasteBox" style="display:none">
       <textarea id="text" placeholder="הדבק כאן את התסריט המדויק. התזמון יילקח מהאודיו."></textarea>
     </div>
+    <div id="engBox" style="display:none">
+      <label>מנוע תמלול</label>
+      <select id="engine"><option value="local">מקומי (whisper)</option></select>
+      <div class="hint" id="engHint"></div>
+    </div>
     <label>שפת הדובר</label>
     <select id="lang">
       <option value="he">עברית</option>
@@ -146,7 +151,7 @@
     <label style="margin-top:15px">הערכות שלי</label>
     <div class="pgrid" id="themes"></div>
     <div class="saverow">
-      <input type="text" id="tname" value="הערכה שלי" placeholder="שם הערכה">
+      <input type="text" id="tname" value="מותג נתנאל" placeholder="שם הערכה">
       <button id="saveTheme">שמור</button>
     </div>
     <div class="msg" id="tsmsg"></div>
@@ -168,6 +173,8 @@
       <input type="range" id="sY" min="5" max="95" step="1"><span class="val" id="vY"></span></div>
     <div class="row"><span class="lb">מרווח שורה</span>
       <input type="range" id="sLH" min="0.9" max="2" step="0.05"><span class="val" id="vLH"></span></div>
+    <div class="row"><span class="lb">ריווח אותיות</span>
+      <input type="range" id="sTrk" min="-4" max="22" step="0.5"><span class="val" id="vTrk"></span></div>
     <div class="row"><span class="lb">הגדלת מילה</span>
       <input type="range" id="sPop" min="1" max="1.5" step="0.02"><span class="val" id="vPop"></span></div>
     <button class="sec2" id="reset" style="background:none;border:1px solid var(--bd);color:var(--mut);margin-top:8px">אפס מיקום למרכז תחתון</button>
@@ -224,8 +231,8 @@
 let META=null, CAPS=[], PRESETS={}, FONTS=[], PKEY='pop_yellow', MODE='auto', LAST=-1;
 let THEMES={}, TKEY=null;      // ערכות ששמרת בעצמך, ואיזו מהן פעילה
 // כתובית דוגמה, כדי שאפשר יהיה לעצב לפני שמתמללים
-const SAMPLE={words:['הכלי','הזה','חוסך','30%','מהזמן'],
-              emph:[false,false,false,true,false], sample:true};
+const SAMPLE={words:['חוסך','30%','מהזמן','עם','/fork'],
+              emph:[false,true,false,false,true], sample:true};
 let STYLE={};
 const $=id=>document.getElementById(id);
 const v=$('v'), box=$('capInner');
@@ -234,7 +241,7 @@ const SWATCHES=['#FFFFFF','#FFD500','#FF3B30','#34C759','#0A84FF','#FF2D9B',
                 '#00E5FF','#FF9500','#AF52DE','#111009','#C4775A','#F0EBE3'];
 
 // ── טעינה ────────────────────────────────────────────────────────────────
-const UI_BUILD='2026-08-27e';
+const UI_BUILD='2026-09-02c';
 
 async function boot(){
   let p,f;
@@ -242,7 +249,21 @@ async function boot(){
   // לכך שפקדים חדשים לא מופיעים אחרי רענון דפדפן בלבד.
   try{
     const rv=await fetch('/api/version');
-    const {build}=await rv.json();
+    const {build,engines}=await rv.json();
+    // רשימת המנועים מגיעה מהשרת. אם יש רק אחד, הבורר בכלל לא מוצג.
+    if(engines && engines.length>1){
+      const sel=$('engine'); sel.innerHTML='';
+      engines.forEach(e=>{
+        const o=document.createElement('option');
+        o.value=e.id; o.textContent=e.label; sel.appendChild(o);
+      });
+      const showHint=()=>{
+        const e=engines.find(x=>x.id===sel.value);
+        $('engHint').textContent=e?e.hint:'';
+      };
+      sel.onchange=showHint; showHint();
+      $('engBox').style.display='block';
+    }
     if(build!==UI_BUILD) throw 0;
   }catch(e){
     document.getElementById('panel').insertAdjacentHTML('afterbegin',
@@ -377,6 +398,8 @@ function syncControls(){
   $('sX').value=STYLE.x_pct;            $('vX').textContent=STYLE.x_pct;
   $('sY').value=STYLE.y_pct;            $('vY').textContent=STYLE.y_pct;
   $('sLH').value=STYLE.line_height;     $('vLH').textContent=(+STYLE.line_height).toFixed(2);
+  if(STYLE.tracking_pct===undefined) STYLE.tracking_pct=0;
+  $('sTrk').value=STYLE.tracking_pct;   $('vTrk').textContent=(+STYLE.tracking_pct).toFixed(1);
   $('sPop').value=STYLE.active_scale;   $('vPop').textContent=(+STYLE.active_scale).toFixed(2);
   $('cText').value=STYLE.color;
   $('cActive').value=STYLE.active_color;
@@ -405,6 +428,7 @@ bind('sSize','size_pct','vSize',parseFloat);
 bind('sX','x_pct','vX',parseFloat);
 bind('sY','y_pct','vY',parseFloat);
 bind('sLH','line_height','vLH',parseFloat);
+bind('sTrk','tracking_pct','vTrk',parseFloat);
 bind('sPop','active_scale','vPop',parseFloat);
 bind('cText','color');
 bind('cActive','active_color');
@@ -458,7 +482,7 @@ $('run').onclick=async()=>{
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({file:META.file,mode:MODE,text:$('text').value,
       max_words:+$('maxw').value,strip_fillers:$('fillers').checked,
-      language:$('lang').value})})).json();
+      language:$('lang').value,engine:$('engine').value})})).json();
   $('run').disabled=false;
   if(j.error){$('tmsg').innerHTML='<span class="err">'+j.error+'</span>';return}
   CAPS=j.captions;
@@ -556,6 +580,9 @@ function tick(){
   box.style.fontFamily=`'${faceName(STYLE.font_file)}'`;
   box.style.fontSize=fs+'px';
   box.style.lineHeight=STYLE.line_height;
+  // ריווח אותיות באחוז מגודל הפונט, בדיוק כמו במנוע הרינדור
+  const trk=fs*(STYLE.tracking_pct||0)/100;
+  box.style.letterSpacing=trk+'px';
 
   const sw=fs*(STYLE.stroke_pct||0)/10;
   const sh=STYLE.shadow||{};
@@ -563,6 +590,9 @@ function tick(){
     const on=k===ai, em=cap.emph&&cap.emph[k];
     let st=`color:${(on||em)?STYLE.active_color:STYLE.color};`;
     st+=`transform:scale(${on?STYLE.active_scale:1});`;
+    // CSS מוסיף ריווח גם אחרי האות האחרונה, ואז המילה יוצאת מוסטת.
+    // מקזזים אותו בקצה של המילה כדי שהמרכוז יישאר נכון.
+    if(trk) st+=`margin-inline-end:${(0.16*fs-trk).toFixed(2)}px;`;
     if(STYLE.stroke_on) st+=`-webkit-text-stroke:${sw}px ${STYLE.stroke_color};paint-order:stroke fill;`;
     if(STYLE.shadow_on) st+=`text-shadow:0 ${fs*(sh.dy_pct||.1)}px ${fs*(sh.blur_pct||.3)}px `
       +`${hexA(STYLE.shadow_color||'#000', STYLE.shadow_opacity)};`;

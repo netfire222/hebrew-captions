@@ -20,7 +20,7 @@ OUT = os.path.join(ROOT, "output")
 os.makedirs(WORK, exist_ok=True)
 os.makedirs(OUT, exist_ok=True)
 
-BUILD = "2026-08-27e"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
+BUILD = "2026-09-02c"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
 THEMES_FILE = os.path.join(ROOT, "themes.json")
 
 app = Flask(__name__, static_folder=None)
@@ -95,7 +95,8 @@ def fontfile(name):
 
 @app.get("/api/version")
 def version():
-    return jsonify({"build": BUILD})
+    # engines מגיע מהשרת, כדי שהממשק לא יקודד בתוכו שמות של מנועים
+    return jsonify({"build": BUILD, "engines": tx.engines()})
 
 
 @app.get("/api/fonts")
@@ -245,8 +246,11 @@ def do_transcribe():
     d = request.json
     path = os.path.join(WORK, d["file"])
     mode = d.get("mode", "auto")
+    engine = d.get("engine", "local")
     try:
-        heard, detected = tx.transcribe_words(path, d.get("language", "he"))
+        heard, detected = tx.transcribe_any(path, d.get("language", "he"),
+                                            engine=engine,
+                                            model=d.get("el_model", "scribe_v1"))
     except ImportError:
         return jsonify({"error": "faster-whisper לא מותקן. הרץ: pip install faster-whisper"}), 500
     except Exception as e:

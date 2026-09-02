@@ -111,12 +111,43 @@ def word_dir(word):
     """
     return "rtl" if _HEB.search(word) else "ltr"
 
-def measure(word, font):
+def visual_chars(word):
+    """
+    התווים של המילה בסדר שבו הם מצוירים על המסך, משמאל לימין.
+    נחוץ רק לריווח אותיות, כי אז מציירים תו-תו.
+    """
+    s = _visual_rtl(word) if _HEB.search(word) else word
+    return list(s)
+
+
+def measure(word, font, tracking=0.0):
+    if tracking:
+        ch = visual_chars(word)
+        return sum(font.getlength(c) for c in ch) + tracking * max(0, len(ch) - 1)
     if HAS_RAQM:
         return font.getlength(word, direction=word_dir(word), language="he")
     return font.getlength(shape(word))
 
-def layout_words(words, font, space_w, fonts=None):
+
+def draw_word(d, xy, word, font, fill, tracking=0.0, **kw):
+    """
+    מצייר מילה אחת.
+
+    כשיש ריווח אותיות אי אפשר להישען על draw.text, כי Pillow לא תומך
+    ב-letter spacing. לכן מציירים תו-תו בסדר ויזואלי. בעברית זה תקף,
+    כי אין עיצוב הקשרי, וזה בדיוק המסלול שכבר עובד כשאין RAQM.
+    כשהריווח אפס חוזרים למסלול המקורי בלי שינוי, כדי לא לסכן רגרסיה.
+    """
+    if not tracking:
+        d.text(xy, shape(word), font=font, fill=fill, **_txt_kw(word), **kw)
+        return
+    x, y = xy
+    for c in visual_chars(word):
+        d.text((x, y), c, font=font, fill=fill, **kw)
+        x += font.getlength(c) + tracking
+
+
+def layout_words(words, font, space_w, fonts=None, tracking_pct=0.0):
     """
     מחזיר [(word, x_left, width)] כשהמילה הראשונה נמצאת הכי ימינה.
     הקואורדינטות יחסיות, 0 = הקצה השמאלי של השורה.
@@ -125,7 +156,8 @@ def layout_words(words, font, space_w, fonts=None):
     אחרת היא תופסת מקום של הגודל הרגיל ודורסת את השכנות.
     """
     fs_ = fonts or [font] * len(words)
-    widths = [measure(w, f) for w, f in zip(words, fs_)]
+    # הריווח נגזר מגודל הפונט של כל מילה, כדי שמילה מוגדלת לא תיראה צפופה
+    widths = [measure(w, f, f.size * tracking_pct / 100) for w, f in zip(words, fs_)]
     total = sum(widths) + space_w * (len(words) - 1)
     out, cursor = [], total                       # מתחילים מימין
     for w, ww in zip(words, widths):
@@ -134,12 +166,12 @@ def layout_words(words, font, space_w, fonts=None):
         cursor -= space_w
     return out, total
 
-def wrap_words(words, font, space_w, max_w):
+def wrap_words(words, font, space_w, max_w, tracking=0.0):
     """שובר לשורות לפי רוחב מרבי, שומר על סדר לוגי."""
     lines, cur = [], []
     for w in words:
         trial = cur + [w]
-        tw = sum(measure(x, font) for x in trial) + space_w * (len(trial) - 1)
+        tw = sum(measure(x, font, tracking) for x in trial) + space_w * (len(trial) - 1)
         if tw > max_w and cur:
             lines.append(cur); cur = [w]
         else:
@@ -175,16 +207,20 @@ def render_caption(size, words, active_idx, preset, font_stack, emph=None):
 
     # התאמת גודל אוטומטית: מקטינים עד שגם המילה הארוכה ביותר נכנסת ברוחב.
     # בלי זה מילה כמו ultrathink נחתכת בקצה הפריים.
+    trk_pct = preset.get("tracking_pct", 0) or 0
+
     for _ in range(60):
         font, _ = _load(fs)
-        widest = max((measure(w, font) * scale for w in words), default=0)
+        t = fs * trk_pct / 100
+        widest = max((measure(w, font, t) * scale for w in words), default=0)
         if widest <= max_w or fs <= 12:
             break
         fs = int(fs * 0.94)
 
     big, _ = _load(max(1, int(fs * scale)))
+    trk = fs * trk_pct / 100
     space_w = max(measure(" ", font), fs * 0.24)   # מינימום, אחרת פונט צר מדביק מילים
-    lines = wrap_words(words, font, space_w, max_w)
+    lines = wrap_words(words, font, space_w, max_w, trk)
 
     lh = fs * preset["line_height"]
     total_h = lh * len(lines)
@@ -213,7 +249,7 @@ def render_caption(size, words, active_idx, preset, font_stack, emph=None):
     bgc = preset.get("bg")
     if bgc:
         for li, lw in enumerate(lines):
-            _, tot = layout_words(lw, font, space_w)
+            _, tot = layout_words(lw, font, space_w, tracking_pct=trk_pct)
             _o = _ox(tot)
             x0 = _o - fs * bgc["pad_x_pct"]
             x1 = _o + tot + fs * bgc["pad_x_pct"]
@@ -237,26 +273,26 @@ def render_caption(size, words, active_idx, preset, font_stack, emph=None):
         lfonts = [big if (active_idx is not None and (li_off + j) == active_idx
                           and preset.get("active_scale", 1) != 1) else font
                   for j in range(len(lw))]
-        placed, tot = layout_words(lw, font, space_w, fonts=lfonts)
+        placed, tot = layout_words(lw, font, space_w, fonts=lfonts, tracking_pct=trk_pct)
         ox = _ox(tot)
         base_y = top + li * lh
         for j, (word, x, ww) in enumerate(placed):
             is_active = (active_idx is not None and idx == active_idx)
             f = lfonts[j]
+            wt = f.size * trk_pct / 100
             wx = ox + x
             wy = base_y - (f.size - font.size) * 0.5
             is_emph = bool(emph and idx < len(emph) and emph[idx])
             col = _hex(preset["active_color"] if (is_active or is_emph) else preset["color"])
 
             if sh:
-                ds.text((wx + fs * sh["dy_pct"] * 0.4, wy + fs * sh["dy_pct"]), shape(word),
-                        font=f, fill=_hex(sh["color"], int(255 * sh["opacity"])),
-                        **_txt_kw(word))
+                draw_word(ds, (wx + fs * sh["dy_pct"] * 0.4, wy + fs * sh["dy_pct"]),
+                          word, f, _hex(sh["color"], int(255 * sh["opacity"])), wt)
             if stroke_w:
-                d.text((wx, wy), shape(word), font=f, fill=col, **_txt_kw(word),
-                       stroke_width=stroke_w, stroke_fill=_hex(_stroke_col))
+                draw_word(d, (wx, wy), word, f, col, wt,
+                          stroke_width=stroke_w, stroke_fill=_hex(_stroke_col))
             else:
-                d.text((wx, wy), shape(word), font=f, fill=col, **_txt_kw(word))
+                draw_word(d, (wx, wy), word, f, col, wt)
             idx += 1
         li_off += len(lw)
 

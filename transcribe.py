@@ -74,6 +74,41 @@ def transcribe_words(video_path, language="he"):
         except OSError: pass
 
 
+# ── בחירת מנוע תמלול ─────────────────────────────────────────────────────
+# מנוע ענן הוא תוסף אופציונלי שיושב ב-transcribe_el.py. אם הקובץ לא קיים,
+# כמו בגרסה הציבורית, הכל ממשיך לעבוד מקומית בלי שום שינוי.
+def _el():
+    try:
+        import transcribe_el
+        return transcribe_el
+    except ImportError:
+        return None
+
+
+def engines():
+    """
+    רשימת מנועי התמלול הזמינים, לבניית הבורר בממשק. המנוע החיצוני מופיע
+    רק אם המודול קיים וגם יש מפתח תקין, ולכן בגרסה הציבורית תמיד יחזור
+    פריט אחד בלבד ולא יהיה בממשק שום אזכור לענן.
+    """
+    out = [{"id": "local", "label": "מקומי (whisper)",
+            "hint": "רץ על המחשב שלך, שום דבר לא נשלח החוצה."}]
+    m = _el()
+    if m and m.key():
+        out.append(dict(m.INFO))
+    return out
+
+
+def transcribe_any(video_path, language="he", engine="local", model="scribe_v1"):
+    """נקודת כניסה אחת. engine הוא local, או שם של מנוע ענן אם הותקן."""
+    if engine != "local":
+        m = _el()
+        if not m:
+            raise RuntimeError("מנוע ענן לא מותקן בעותק הזה")
+        return m.transcribe(video_path, language, model)
+    return transcribe_words(video_path, language)
+
+
 def _norm(s):
     return re.sub(r"[^\w%]+", "", s, flags=re.UNICODE).lower()
 

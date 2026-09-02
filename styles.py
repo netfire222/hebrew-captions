@@ -64,8 +64,8 @@ PRESETS = {
 
     # ── 3. סגנון המותג שלך: טרקוטה על שחור, מתאים למדריכים
     "brand": {
-        "label": "צבעי מותג",
-        "hint": "דוגמה לערכת מותג. טרקוטה על שחור. שנה לצבעים שלך.",
+        "label": "מותג נתנאל",
+        "hint": "בצבעי המותג שלך. טרקוטה על שחור, מתאים לתוכן מקצועי.",
         "font": "extrabold",
         "size_pct": 6.0,
         "line_height": 1.25,
@@ -169,6 +169,7 @@ _PRESET_FONT_FILE = {
 for _k, _p in PRESETS.items():
     _p.setdefault("font_file", _PRESET_FONT_FILE.get(_k, "Rubik-Black.ttf"))
     _p.setdefault("x_pct", 50)          # מרכז אופקי
+    _p.setdefault("tracking_pct", 0)    # ריווח בין אותיות, אחוז מגודל הפונט
     _p.setdefault("stroke_on", bool(_p.get("stroke")))
     _p.setdefault("shadow_on", bool(_p.get("shadow")))
     _p.setdefault("stroke_color", _p.get("stroke") or "#000000")
