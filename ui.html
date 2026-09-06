@@ -241,7 +241,7 @@ const SWATCHES=['#FFFFFF','#FFD500','#FF3B30','#34C759','#0A84FF','#FF2D9B',
                 '#00E5FF','#FF9500','#AF52DE','#111009','#C4775A','#F0EBE3'];
 
 // ── טעינה ────────────────────────────────────────────────────────────────
-const UI_BUILD='2026-09-02c';
+const UI_BUILD='2026-09-02d';
 
 async function boot(){
   let p,f;
@@ -564,11 +564,13 @@ function tick(){
     LAST=ci;
     document.querySelectorAll('.crow').forEach(r=>r.classList.toggle('on',+r.dataset.i===ci));
   }
-  // אין כתובית ברגע הזה? מציגים דוגמה, כדי שהעיצוב תמיד יהיה גלוי.
-  // המילה המודגשת מתחלפת לבד כדי שרואים גם את אפקט ההדגשה.
+  // אין כתובית ברגע הזה. אם כבר יש תמלול, לא מציגים כלום, בדיוק כמו
+  // שיקרה בייצוא. כתובית הדוגמה נועדה רק לעצב לפני שמתמללים, ולכן
+  // ברגע שיש כתוביות אמיתיות היא נעלמת ולא קופצת יותר ברקע.
   if(!cap){
+    if(CAPS.length){ if(box.innerHTML) box.innerHTML=''; return; }
     cap=SAMPLE;
-    ai=Math.floor(Date.now()/700)%SAMPLE.words.length;
+    ai=Math.floor(Date.now()/900)%SAMPLE.words.length;
   }
 
   const wrapEl=document.getElementById('wrap');
