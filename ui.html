@@ -193,6 +193,13 @@
     <label>צבע המילה הנוכחית</label>
     <div class="sw"><input type="color" id="cActive"><div class="chips" id="chActive"></div></div>
 
+    <div class="saverow" style="margin-top:9px">
+      <button id="c2a" style="background:none;border:1px solid var(--bd);color:var(--mut);font-size:11.5px;padding:7px 10px;flex:1">אותו צבע למילה</button>
+      <button id="a2c" style="background:none;border:1px solid var(--bd);color:var(--mut);font-size:11.5px;padding:7px 10px;flex:1">אותו צבע לטקסט</button>
+      <button id="swapc" style="background:none;border:1px solid var(--bd);color:var(--mut);font-size:11.5px;padding:7px 10px;flex:none">⇄</button>
+    </div>
+    <div class="hint">כששני הצבעים זהים, ההדגשה נשארת רק בהגדלת המילה.</div>
+
     <label class="tog"><input type="checkbox" id="tStroke"> קונטור</label>
     <div id="strokeBox">
       <div class="sw"><input type="color" id="cStroke"></div>
@@ -246,7 +253,7 @@ const SWATCHES=['#FFFFFF','#FFD500','#FF3B30','#34C759','#0A84FF','#FF2D9B',
                 '#00E5FF','#FF9500','#AF52DE','#111009','#C4775A','#F0EBE3'];
 
 // ── טעינה ────────────────────────────────────────────────────────────────
-const UI_BUILD='2026-09-15a';
+const UI_BUILD='2026-09-15b';
 
 async function boot(){
   let p,f;
@@ -478,6 +485,15 @@ bind('sShadow','shadow_opacity','vShadow',parseFloat);
 $('tStroke').onchange=()=>{STYLE.stroke_on=$('tStroke').checked;toggleBoxes()};
 $('tShadow').onchange=()=>{STYLE.shadow_on=$('tShadow').checked;toggleBoxes()};
 $('reset').onclick=()=>{STYLE.x_pct=50;STYLE.y_pct=75;syncControls()};
+
+// ── שכפול צבעים ──────────────────────────────────────────────────────────
+// syncControls מרענן את כל הפקדים, ולכן די בלעדכן את STYLE ולקרוא לו.
+function setColors(text, active){
+  STYLE.color=text; STYLE.active_color=active; syncControls();
+}
+$('c2a').onclick=()=>setColors(STYLE.color, STYLE.color);      // טקסט לשתיהן
+$('a2c').onclick=()=>setColors(STYLE.active_color, STYLE.active_color);
+$('swapc').onclick=()=>setColors(STYLE.active_color, STYLE.color);
 
 // ── גרירה על הווידאו ─────────────────────────────────────────────────────
 let dragging=false;

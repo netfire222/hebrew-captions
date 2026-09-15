@@ -20,7 +20,7 @@ OUT = os.path.join(ROOT, "output")
 os.makedirs(WORK, exist_ok=True)
 os.makedirs(OUT, exist_ok=True)
 
-BUILD = "2026-09-15a"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
+BUILD = "2026-09-15b"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
 THEMES_FILE = os.path.join(ROOT, "themes.json")
 
 app = Flask(__name__, static_folder=None)
