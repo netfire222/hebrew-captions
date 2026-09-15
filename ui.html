@@ -113,6 +113,10 @@
     <h2>1 · סרטון</h2>
     <input type="file" id="file" accept="video/*">
     <div class="msg" id="vmsg"></div>
+    <div id="lastBox" style="display:none;margin-top:9px">
+      <button id="lastBtn" style="background:none;border:1px solid var(--bd);color:var(--mut);font-size:12px;padding:8px 12px"></button>
+      <div class="hint">הסרטון שהעלית קודם עדיין כאן. אין צורך להעלות שוב.</div>
+    </div>
   </div>
 
   <div class="sec">
@@ -140,6 +144,7 @@
     <label>מילים מקסימום בכתובית</label>
     <input type="number" id="maxw" value="4" min="1" max="8">
     <button id="run" style="margin-top:11px" disabled>הפק כתוביות</button>
+    <div class="hint" id="runHint">צריך להעלות סרטון קודם, בסעיף 1.</div>
     <div class="msg" id="tmsg"></div>
   </div>
 
@@ -241,7 +246,7 @@ const SWATCHES=['#FFFFFF','#FFD500','#FF3B30','#34C759','#0A84FF','#FF2D9B',
                 '#00E5FF','#FF9500','#AF52DE','#111009','#C4775A','#F0EBE3'];
 
 // ── טעינה ────────────────────────────────────────────────────────────────
-const UI_BUILD='2026-09-02d';
+const UI_BUILD='2026-09-15a';
 
 async function boot(){
   let p,f;
@@ -295,8 +300,42 @@ async function boot(){
   loadPreset(PKEY);
   drawPresets(); if(FONTS.length) drawFonts(); drawSwatches();
   await loadThemes();
+  offerLast();
 }
 boot();
+
+// ── טעינת סרטון ──────────────────────────────────────────────────────────
+// מרכז אחד שמעמיד את הווידאו, כדי שהעלאה חדשה וחזרה לסרטון קיים
+// יעברו באותו מסלול ולא ישכחו להדליק כפתור.
+function useVideo(m){
+  META=m; v.src='/media/'+m.file;
+  $('empty').style.display='none'; $('wrap').style.display='block';
+  fitVideo();
+  $('vmsg').textContent=`${m.w}x${m.h} · ${m.dur.toFixed(1)} שניות · ${m.fps.toFixed(0)}fps`;
+  $('run').disabled=false;
+  $('runHint').style.display='none';
+  $('lastBox').style.display='none';
+  showStorage();
+}
+
+// אחרי רענון הדף META מתאפס, אבל הקובץ עדיין ב-work. מציעים לחזור אליו
+// במקום להשאיר את המשתמש עם כפתור מת בלי הסבר.
+async function offerLast(){
+  if(META) return;
+  try{
+    const s=await (await fetch('/api/storage')).json();
+    if(!s.work.n) return;
+    const f=s.work.files[0];
+    $('lastBtn').textContent='המשך עם '+f.name+' ('+Math.round(f.bytes/1048576)+'MB)';
+    $('lastBtn').onclick=async()=>{
+      $('lastBtn').disabled=true; $('lastBtn').textContent='טוען...';
+      const m=await (await fetch('/api/meta/'+encodeURIComponent(f.name))).json();
+      if(m.error){ $('vmsg').innerHTML='<span class="err">'+m.error+'</span>'; return; }
+      useVideo(m);
+    };
+    $('lastBox').style.display='block';
+  }catch(e){}
+}
 
 function faceName(file){ return 'F_'+file.replace(/[^A-Za-z0-9]/g,'_'); }
 
@@ -468,12 +507,7 @@ $('file').onchange=async e=>{
   const fd=new FormData(); fd.append('video',f);
   const j=await (await fetch('/api/upload',{method:'POST',body:fd})).json();
   if(j.error){$('vmsg').innerHTML='<span class="err">'+j.error+'</span>';return}
-  META=j; v.src='/media/'+j.file;
-  $('empty').style.display='none'; $('wrap').style.display='block';
-  fitVideo();
-  $('vmsg').textContent=`${j.w}x${j.h} · ${j.dur.toFixed(1)} שניות · ${j.fps.toFixed(0)}fps`;
-  $('run').disabled=false;
-  showStorage();
+  useVideo(j);
 };
 
 $('run').onclick=async()=>{

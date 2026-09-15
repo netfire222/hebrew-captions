@@ -20,7 +20,7 @@ OUT = os.path.join(ROOT, "output")
 os.makedirs(WORK, exist_ok=True)
 os.makedirs(OUT, exist_ok=True)
 
-BUILD = "2026-09-02d"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
+BUILD = "2026-09-15a"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
 THEMES_FILE = os.path.join(ROOT, "themes.json")
 
 app = Flask(__name__, static_folder=None)
@@ -97,6 +97,23 @@ def fontfile(name):
 def version():
     # engines מגיע מהשרת, כדי שהממשק לא יקודד בתוכו שמות של מנועים
     return jsonify({"build": BUILD, "engines": tx.engines()})
+
+
+@app.get("/api/meta/<path:name>")
+def meta_for(name):
+    """
+    מטא-דאטה של סרטון שכבר יושב ב-work. נחוץ כדי לחזור לסרטון אחרי
+    שהדף נטען מחדש, במקום להעלות אותו שוב.
+    """
+    path = os.path.join(WORK, name)
+    if not os.path.isfile(path):
+        return jsonify({"error": "הקובץ לא נמצא"}), 404
+    try:
+        m = probe(path)
+    except Exception as e:
+        return jsonify({"error": f"קובץ וידאו לא תקין: {e}"}), 400
+    m.update({"id": os.path.splitext(name)[0], "file": name})
+    return jsonify(m)
 
 
 @app.get("/api/fonts")
