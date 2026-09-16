@@ -222,14 +222,30 @@
   </div>
 
   <div class="sec">
-    <h2>8 · ייצוא</h2>
+    <h2>8 · אפקטים קוליים</h2>
+    <div id="sfxGen" style="display:none">
+      <input type="text" id="sfxText" placeholder="תאר את האפקט. למשל: וואוש קצר למעבר">
+      <div class="row"><span class="lb">אורך</span>
+        <input type="range" id="sfxDur" min="0.5" max="8" step="0.5" value="2"><span class="val" id="vSfxDur">2.0</span></div>
+      <button id="sfxMake" style="margin-top:4px">צור אפקט</button>
+      <div class="msg" id="sfxMsg"></div>
+    </div>
+    <label style="margin-top:12px">הספרייה</label>
+    <div id="sfxLib"></div>
+    <div class="hint">אפשר גם להפיל קובצי אודיו ישירות לתיקייה <span style="direction:ltr;unicode-bidi:isolate">audio/</span> שליד הכלי.</div>
+    <label style="margin-top:14px">על ציר הזמן</label>
+    <div id="fxList"></div>
+  </div>
+
+  <div class="sec">
+    <h2>9 · ייצוא</h2>
     <button id="exp" disabled>ייצא סרטון עם הכתוביות בפנים</button>
     <div class="bar" id="bar" style="display:none"><i></i></div>
     <div class="msg" id="emsg"></div>
   </div>
 
   <div class="sec">
-    <h2>9 · שטח בדיסק</h2>
+    <h2>10 · שטח בדיסק</h2>
     <div class="msg" id="stor">בודק...</div>
     <div class="modes" style="margin-top:9px">
       <button id="clnOld">נקה קבצים ישנים</button>
@@ -253,7 +269,7 @@ const SWATCHES=['#FFFFFF','#FFD500','#FF3B30','#34C759','#0A84FF','#FF2D9B',
                 '#00E5FF','#FF9500','#AF52DE','#111009','#C4775A','#F0EBE3'];
 
 // ── טעינה ────────────────────────────────────────────────────────────────
-const UI_BUILD='2026-09-15b';
+const UI_BUILD='2026-09-16a';
 
 async function boot(){
   let p,f;
@@ -308,6 +324,7 @@ async function boot(){
   drawPresets(); if(FONTS.length) drawFonts(); drawSwatches();
   await loadThemes();
   offerLast();
+  loadLib(); drawFx();
 }
 boot();
 
@@ -670,7 +687,7 @@ $('exp').onclick=async()=>{
   $('exp').disabled=true; $('bar').style.display='block'; $('emsg').textContent='';
   const {job}=await (await fetch('/api/export',{method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({file:META.file,captions:CAPS,style:STYLE})})).json();
+    body:JSON.stringify({file:META.file,captions:CAPS,style:STYLE,fx:FX})})).json();
   const iv=setInterval(async()=>{
     const s=await (await fetch('/api/export/'+job)).json();
     $('bar').querySelector('i').style.width=(s.pct||0)+'%';
@@ -681,6 +698,88 @@ $('exp').onclick=async()=>{
         : `מוכן. <a href="${s.url}" style="color:var(--acc2)">הורדה</a>`;
       showStorage()}
   },800);
+};
+
+// ── אפקטים קוליים ────────────────────────────────────────────────────────
+// LIB היא הספרייה שעל הדיסק, FX הן ההנחות על ציר הזמן. אפקט אחד
+// מהספרייה יכול לשבת בכמה זמנים שונים, ולכן אלה שתי רשימות נפרדות.
+let LIB=[], FX=[], PREVIEW=null;
+
+async function loadLib(){
+  try{
+    const d=await (await fetch('/api/audio')).json();
+    LIB=d.files||[];
+    if(d.can_generate) $('sfxGen').style.display='block';
+    drawLib();
+  }catch(e){ $('sfxLib').innerHTML='<div class="msg err">טעינת הספרייה נכשלה</div>'; }
+}
+
+function drawLib(){
+  if(!LIB.length){ $('sfxLib').innerHTML='<div class="msg">הספרייה ריקה.</div>'; return; }
+  $('sfxLib').innerHTML=LIB.map((f,i)=>
+    `<div class="crow">
+       <span class="t" data-play="${i}" style="cursor:pointer">▶</span>
+       <span class="x" style="cursor:default">${f.name}${f.dur?' · '+f.dur.toFixed(1)+'ש':''}</span>
+       <span class="t" data-add="${i}" style="cursor:pointer">הוסף</span>
+       <span class="del" data-rmlib="${i}">×</span>
+     </div>`).join('');
+
+  $('sfxLib').querySelectorAll('[data-play]').forEach(el=>el.onclick=()=>{
+    if(PREVIEW) PREVIEW.pause();
+    PREVIEW=new Audio('/audio/'+encodeURIComponent(LIB[+el.dataset.play].name));
+    PREVIEW.play();
+  });
+  // מוסיפים בזמן הנוכחי של הנגן, כי זה הרגע שהמשתמש מסתכל עליו
+  $('sfxLib').querySelectorAll('[data-add]').forEach(el=>el.onclick=()=>{
+    if(!META){ $('sfxMsg').innerHTML='<span class="err">קודם סרטון.</span>'; return; }
+    FX.push({file:LIB[+el.dataset.add].name, t:+v.currentTime.toFixed(2), vol:0.8});
+    FX.sort((a,b)=>a.t-b.t); drawFx();
+  });
+  $('sfxLib').querySelectorAll('[data-rmlib]').forEach(el=>el.onclick=async()=>{
+    const n=LIB[+el.dataset.rmlib].name;
+    if(!confirm('למחוק את '+n+' מהספרייה?')) return;
+    await fetch('/api/audio/delete',{method:'POST',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({name:n})});
+    FX=FX.filter(x=>x.file!==n); drawFx(); loadLib();
+  });
+}
+
+function drawFx(){
+  if(!FX.length){ $('fxList').innerHTML='<div class="msg">עדיין לא הנחת אפקטים.</div>'; return; }
+  $('fxList').innerHTML=FX.map((f,i)=>
+    `<div class="crow">
+       <span class="t" data-seekfx="${i}" style="cursor:pointer">${f.t.toFixed(1)}</span>
+       <span class="x" style="cursor:default">${f.file}</span>
+       <input type="range" data-vol="${i}" min="0" max="1.5" step="0.05" value="${f.vol}"
+              style="flex:none;width:70px;accent-color:var(--acc)">
+       <span class="del" data-rmfx="${i}">×</span>
+     </div>`).join('');
+  $('fxList').querySelectorAll('[data-seekfx]').forEach(el=>el.onclick=()=>{
+    v.currentTime=FX[+el.dataset.seekfx].t;
+  });
+  $('fxList').querySelectorAll('[data-vol]').forEach(el=>el.oninput=()=>{
+    FX[+el.dataset.vol].vol=+el.value;
+  });
+  $('fxList').querySelectorAll('[data-rmfx]').forEach(el=>el.onclick=()=>{
+    FX.splice(+el.dataset.rmfx,1); drawFx();
+  });
+}
+
+bind('sfxDur',null,'vSfxDur',parseFloat);
+$('sfxDur').oninput=()=>{ $('vSfxDur').textContent=(+$('sfxDur').value).toFixed(1); };
+
+$('sfxMake').onclick=async()=>{
+  const t=$('sfxText').value.trim();
+  if(!t){ $('sfxMsg').innerHTML='<span class="err">צריך תיאור.</span>'; return; }
+  $('sfxMake').disabled=true; $('sfxMsg').textContent='מייצר...';
+  const j=await (await fetch('/api/sfx',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({text:t,duration:+$('sfxDur').value})})).json();
+  $('sfxMake').disabled=false;
+  if(j.error){ $('sfxMsg').innerHTML='<span class="err">'+j.error+'</span>'; return; }
+  $('sfxMsg').textContent='נוצר: '+j.name;
+  $('sfxText').value='';
+  await loadLib();
 };
 
 // ── ניהול שטח ────────────────────────────────────────────────────────────

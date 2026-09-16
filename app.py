@@ -17,10 +17,14 @@ import transcribe as tx
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(ROOT, "work")
 OUT = os.path.join(ROOT, "output")
+AUDIO = os.path.join(ROOT, "audio")     # ספריית אפקטים קוליים
 os.makedirs(WORK, exist_ok=True)
 os.makedirs(OUT, exist_ok=True)
+os.makedirs(AUDIO, exist_ok=True)
 
-BUILD = "2026-09-15b"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
+AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac", ".ogg")
+
+BUILD = "2026-09-16a"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
 THEMES_FILE = os.path.join(ROOT, "themes.json")
 
 app = Flask(__name__, static_folder=None)
@@ -114,6 +118,73 @@ def meta_for(name):
         return jsonify({"error": f"קובץ וידאו לא תקין: {e}"}), 400
     m.update({"id": os.path.splitext(name)[0], "file": name})
     return jsonify(m)
+
+
+# ── אפקטים קוליים ────────────────────────────────────────────────────────
+# הספרייה היא סתם תיקייה עם קובצי אודיו. אפשר להפיל לשם קבצים ביד.
+# יצירה מטקסט היא תוסף אופציונלי ב-sfx_gen.py, בדיוק כמו מנוע התמלול.
+def _sfx_gen():
+    try:
+        import sfx_gen
+        return sfx_gen
+    except ImportError:
+        return None
+
+
+def audio_dur(path):
+    """אורך קובץ אודיו בשניות, או None אם אי אפשר לקרוא."""
+    try:
+        import imageio_ffmpeg
+        gen = imageio_ffmpeg.read_frames(path)
+        try:
+            return float(next(gen)["duration"])
+        finally:
+            gen.close()
+    except Exception:
+        return None
+
+
+@app.get("/api/audio")
+def audio_list():
+    out = []
+    for n in sorted(os.listdir(AUDIO)):
+        if n.startswith(".") or not n.lower().endswith(AUDIO_EXT):
+            continue
+        p = os.path.join(AUDIO, n)
+        out.append({"name": n, "bytes": os.path.getsize(p), "dur": audio_dur(p)})
+    return jsonify({"files": out, "can_generate": bool(_sfx_gen())})
+
+
+@app.get("/audio/<path:name>")
+def audio_file(name):
+    return send_from_directory(AUDIO, name)
+
+
+@app.post("/api/audio/delete")
+def audio_delete():
+    n = (request.json or {}).get("name") or ""
+    p = os.path.join(AUDIO, os.path.basename(n))
+    if os.path.isfile(p):
+        os.remove(p)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/sfx")
+def sfx_make():
+    m = _sfx_gen()
+    if not m:
+        return jsonify({"error": "יצירת אפקטים לא מותקנת בעותק הזה"}), 400
+    d = request.json or {}
+    text = (d.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "צריך לתאר את האפקט"}), 400
+    try:
+        name = m.generate(text, AUDIO, duration=d.get("duration"),
+                          influence=d.get("influence"))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    p = os.path.join(AUDIO, name)
+    return jsonify({"name": name, "bytes": os.path.getsize(p), "dur": audio_dur(p)})
 
 
 @app.get("/api/fonts")
@@ -299,7 +370,50 @@ def build_states(captions, fps, dur):
     return states
 
 
-def export_job(job, file, captions, style, meta):
+def has_audio(path):
+    """האם לקובץ יש פס קול. בלי הבדיקה הזאת ערבוב על סרטון אילם נופל."""
+    try:
+        import imageio_ffmpeg
+        gen = imageio_ffmpeg.read_frames(path)
+        try:
+            return bool(next(gen).get("audio_codec"))
+        finally:
+            gen.close()
+    except Exception:
+        return True          # בספק, מניחים שיש ונותנים ל-ffmpeg להחליט
+
+
+def audio_filter(src_has_audio, fx):
+    """
+    בונה את שרשרת האודיו לערבוב האפקטים.
+
+    כל אפקט מושהה למקומו בציר הזמן עם adelay, מקבל את העוצמה שלו,
+    והכל מתערבב עם פס הקול המקורי. normalize=0 חיוני, אחרת amix מחליש
+    את הקול המקורי לפי מספר המקורות והדיבור נבלע.
+    """
+    parts, names = [], []
+    if src_has_audio:
+        parts.append("[0:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a0]")
+        names.append("[a0]")
+    for i, f in enumerate(fx):
+        idx = i + 2                       # 0 וידאו, 1 פריימים, ומכאן האפקטים
+        ms = max(0, int(round(float(f.get("t", 0)) * 1000)))
+        vol = float(f.get("vol", 0.8))
+        parts.append(
+            f"[{idx}:a]aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo,"
+            f"volume={vol:.3f},adelay={ms}|{ms}[fx{i}]")
+        names.append(f"[fx{i}]")
+    if not names:
+        return None, None
+    if len(names) == 1 and src_has_audio:
+        return ";".join(parts), "[a0]"
+    parts.append(f"{''.join(names)}amix=inputs={len(names)}:normalize=0:"
+                 f"dropout_transition=0[aout]")
+    return ";".join(parts), "[aout]"
+
+
+def export_job(job, file, captions, style, meta, fx=None):
+    fx = fx or []
     try:
         preset = style
         stack = styles.FONT_STACKS.get(preset.get("font"), styles.FONT_STACKS["rubik_black"])
@@ -339,12 +453,27 @@ def export_job(job, file, captions, style, meta):
         JOBS[job]["pct"] = 75
         outname = f"captioned_{job}.mp4"
         outpath = os.path.join(OUT, outname)
-        subprocess.run(
-            [FFMPEG, "-v", "error", "-i", os.path.join(WORK, file),
-             "-framerate", str(fps), "-i", os.path.join(tmp, "%06d.png"),
-             "-filter_complex", "[0:v][1:v]overlay=0:0:shortest=1,format=yuv420p",
-             "-c:v", "libx264", "-crf", "18", "-preset", "medium",
-             "-c:a", "copy", outpath, "-y"], check=True)
+        src = os.path.join(WORK, file)
+
+        cmd = [FFMPEG, "-v", "error", "-i", src,
+               "-framerate", str(fps), "-i", os.path.join(tmp, "%06d.png")]
+        for f in fx:
+            cmd += ["-i", os.path.join(AUDIO, os.path.basename(f["file"]))]
+
+        vchain = "[0:v][1:v]overlay=0:0:shortest=1,format=yuv420p[vout]"
+        if fx:
+            JOBS[job]["stage"] = "מערבב אפקטים"
+            achain, alabel = audio_filter(has_audio(src), fx)
+            cmd += ["-filter_complex", vchain + ";" + achain,
+                    "-map", "[vout]", "-map", alabel,
+                    "-c:a", "aac", "-b:a", "192k"]
+        else:
+            cmd += ["-filter_complex", vchain, "-map", "[vout]"]
+            if has_audio(src):
+                cmd += ["-map", "0:a", "-c:a", "copy"]
+
+        cmd += ["-c:v", "libx264", "-crf", "18", "-preset", "medium", outpath, "-y"]
+        subprocess.run(cmd, check=True)
         shutil.rmtree(tmp, ignore_errors=True)
         JOBS[job].update({"pct": 100, "stage": "מוכן", "done": True, "url": f"/out/{outname}"})
     except Exception as e:
@@ -358,7 +487,8 @@ def export():
     JOBS[job] = {"pct": 0, "stage": "מתחיל", "done": False}
     meta = probe(os.path.join(WORK, d["file"]))
     threading.Thread(target=export_job,
-                     args=(job, d["file"], d["captions"], d["style"], meta),
+                     args=(job, d["file"], d["captions"], d["style"], meta,
+                           d.get("fx") or []),
                      daemon=True).start()
     return jsonify({"job": job})
 
