@@ -24,7 +24,7 @@ os.makedirs(AUDIO, exist_ok=True)
 
 AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac", ".ogg")
 
-BUILD = "2026-09-16b"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
+BUILD = "2026-09-16c"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
 THEMES_FILE = os.path.join(ROOT, "themes.json")
 
 app = Flask(__name__, static_folder=None)
@@ -158,6 +158,38 @@ def audio_dur(path):
     return None
 
 
+def level_audio(path, target=-1.5, tol=0.4, rounds=3):
+    """
+    מיישר את עוצמת השיא של קובץ אודיו.
+
+    בלי זה אפקט אחד רועם והשני כמעט לא נשמע, וסרגל העוצמה מתנהג שונה
+    בכל קובץ. זה peak normalize ולא דחיסה, כלומר הדינמיקה נשמרת.
+    הסיבובים החוזרים נחוצים כי קובץ שהגיע קלוּף חוזר לשיא אחרי קידוד.
+    """
+    for _ in range(rounds):
+        r = subprocess.run([FFMPEG, "-hide_banner", "-nostats", "-i", path,
+                            "-af", "volumedetect", "-f", "null", "-"],
+                           capture_output=True, text=True)
+        m = re.search(r"max_volume:\s*(-?[\d.]+) dB", r.stderr)
+        if not m:
+            return None
+        cur = float(m.group(1))
+        if abs(target - cur) < tol:
+            return cur
+        tmp = path + ".lvl.mp3"
+        try:
+            subprocess.run([FFMPEG, "-v", "error", "-i", path, "-af",
+                            f"volume={target - cur:.2f}dB",
+                            "-c:a", "libmp3lame", "-b:a", "192k", tmp, "-y"],
+                           check=True)
+            shutil.move(tmp, path)
+        except Exception:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+            return cur
+    return cur
+
+
 @app.get("/api/audio")
 def audio_list():
     out = []
@@ -198,7 +230,27 @@ def sfx_make():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     p = os.path.join(AUDIO, name)
+    level_audio(p)          # כדי שכל האפקטים יהיו באותה עוצמה
     return jsonify({"name": name, "bytes": os.path.getsize(p), "dur": audio_dur(p)})
+
+
+@app.post("/api/audio/rename")
+def audio_rename():
+    """שם עברי קריא במקום השם שנגזר מהתיאור באנגלית."""
+    d = request.json or {}
+    old = os.path.basename(d.get("name") or "")
+    new = os.path.basename((d.get("to") or "").strip())
+    if not old or not new:
+        return jsonify({"error": "חסר שם"}), 400
+    if not new.lower().endswith(AUDIO_EXT):
+        new += os.path.splitext(old)[1] or ".mp3"
+    src, dst = os.path.join(AUDIO, old), os.path.join(AUDIO, new)
+    if not os.path.isfile(src):
+        return jsonify({"error": "הקובץ לא נמצא"}), 404
+    if os.path.exists(dst) and dst != src:
+        return jsonify({"error": "כבר קיים קובץ בשם הזה"}), 400
+    os.rename(src, dst)
+    return jsonify({"ok": True, "name": new})
 
 
 @app.get("/api/fonts")

@@ -271,7 +271,7 @@ const SWATCHES=['#FFFFFF','#FFD500','#FF3B30','#34C759','#0A84FF','#FF2D9B',
                 '#00E5FF','#FF9500','#AF52DE','#111009','#C4775A','#F0EBE3'];
 
 // ── טעינה ────────────────────────────────────────────────────────────────
-const UI_BUILD='2026-09-16b';
+const UI_BUILD='2026-09-16c';
 
 async function boot(){
   let p,f;
@@ -749,8 +749,21 @@ function drawLib(){
        <span class="t" data-play="${i}" style="cursor:pointer">▶</span>
        <span class="x" style="cursor:default">${f.name}${f.dur?' · '+f.dur.toFixed(1)+'ש':''}</span>
        <span class="t" data-add="${i}" style="cursor:pointer">הוסף</span>
+       <span class="t" data-ren="${i}" style="cursor:pointer">שם</span>
        <span class="del" data-rmlib="${i}">×</span>
      </div>`).join('');
+
+  $('sfxLib').querySelectorAll('[data-ren]').forEach(el=>el.onclick=async()=>{
+    const f=LIB[+el.dataset.ren];
+    const to=prompt('שם חדש לאפקט',f.name.replace(/\.[^.]+$/,''));
+    if(!to) return;
+    const j=await (await fetch('/api/audio/rename',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:f.name,to:to})})).json();
+    if(j.error){ $('sfxMsg').innerHTML='<span class="err">'+j.error+'</span>'; return; }
+    FX.forEach(x=>{ if(x.file===f.name) x.file=j.name; });
+    drawFx(); loadLib();
+  });
 
   $('sfxLib').querySelectorAll('[data-play]').forEach(el=>el.onclick=()=>{
     if(PREVIEW) PREVIEW.pause();
