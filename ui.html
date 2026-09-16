@@ -224,7 +224,9 @@
   <div class="sec">
     <h2>8 · אפקטים קוליים</h2>
     <div id="sfxGen" style="display:none">
-      <input type="text" id="sfxText" placeholder="תאר את האפקט. למשל: וואוש קצר למעבר">
+      <label>קיצורים מוזיקליים</label>
+      <div class="chips" id="sfxPresets" style="gap:6px"></div>
+      <input type="text" id="sfxText" style="margin-top:8px" placeholder="או תאר בעצמך. אנגלית עובדת טוב יותר.">
       <div class="row"><span class="lb">אורך</span>
         <input type="range" id="sfxDur" min="0.5" max="8" step="0.5" value="2"><span class="val" id="vSfxDur">2.0</span></div>
       <button id="sfxMake" style="margin-top:4px">צור אפקט</button>
@@ -269,7 +271,7 @@ const SWATCHES=['#FFFFFF','#FFD500','#FF3B30','#34C759','#0A84FF','#FF2D9B',
                 '#00E5FF','#FF9500','#AF52DE','#111009','#C4775A','#F0EBE3'];
 
 // ── טעינה ────────────────────────────────────────────────────────────────
-const UI_BUILD='2026-09-16a';
+const UI_BUILD='2026-09-16b';
 
 async function boot(){
   let p,f;
@@ -705,11 +707,37 @@ $('exp').onclick=async()=>{
 // מהספרייה יכול לשבת בכמה זמנים שונים, ולכן אלה שתי רשימות נפרדות.
 let LIB=[], FX=[], PREVIEW=null;
 
+// ניסוחים מוזיקליים מוכנים. התווית בעברית כי ככה חושבים, והפרומפט
+// באנגלית כי המודל מגיב אליה טוב יותר. המילים musical ו-tonal הן מה
+// שמושך את התוצאה לצליל מוזיקלי במקום רעש סביבה.
+const SFX_PRESETS=[
+  ['וואוש מעבר', 'musical whoosh transition, synth sweep, tonal, clean, modern social media', 1.5],
+  ['ריזר',       'short musical riser, rising synth tension build, tonal, ends abruptly', 2.5],
+  ['דראפ באס',   'deep musical bass drop impact, sub hit, punchy, tonal, cinematic', 2],
+  ['דינג',       'bright musical bell ding, single clear note, positive, tonal, clean', 1],
+  ['בראם',       'spacious cinematic braam, deep brass note, trailer impact, musical', 3],
+  ['פופ שובב',   'short playful marimba pop, single bright note, light and bouncy, musical', 1],
+  ['נצנוץ',      'magical sparkle chime, ascending glockenspiel notes, musical, light', 1.5],
+  ['סטינג סיום', 'short musical sting, resolved chord ending, warm, conclusive', 2],
+];
+
+function drawSfxPresets(){
+  $('sfxPresets').innerHTML=SFX_PRESETS.map((p,i)=>
+    `<span class="chip" data-p="${i}" style="width:auto;height:auto;padding:5px 11px;
+       font-size:11.5px;color:var(--mut);background:var(--card2);border-color:var(--bd)">${p[0]}</span>`).join('');
+  $('sfxPresets').querySelectorAll('[data-p]').forEach(el=>el.onclick=()=>{
+    const p=SFX_PRESETS[+el.dataset.p];
+    $('sfxText').value=p[1];
+    $('sfxDur').value=p[2]; $('vSfxDur').textContent=p[2].toFixed(1);
+    $('sfxMsg').textContent='מוכן ליצירה: '+p[0];
+  });
+}
+
 async function loadLib(){
   try{
     const d=await (await fetch('/api/audio')).json();
     LIB=d.files||[];
-    if(d.can_generate) $('sfxGen').style.display='block';
+    if(d.can_generate){ $('sfxGen').style.display='block'; drawSfxPresets(); }
     drawLib();
   }catch(e){ $('sfxLib').innerHTML='<div class="msg err">טעינת הספרייה נכשלה</div>'; }
 }

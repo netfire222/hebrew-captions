@@ -7,7 +7,7 @@
 התצוגה החיה רצה בדפדפן (מהיר, בלי רינדור), והייצוא הסופי רץ ב-PIL
 עם אותם פריסטים בדיוק, כדי שמה שרואים הוא מה שמקבלים.
 """
-import os, json, uuid, subprocess, shutil, tempfile, threading
+import os, re, json, uuid, subprocess, shutil, tempfile, threading
 from flask import Flask, request, jsonify, send_from_directory, Response
 
 import styles
@@ -24,7 +24,7 @@ os.makedirs(AUDIO, exist_ok=True)
 
 AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac", ".ogg")
 
-BUILD = "2026-09-16a"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
+BUILD = "2026-09-16b"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
 THEMES_FILE = os.path.join(ROOT, "themes.json")
 
 app = Flask(__name__, static_folder=None)
@@ -132,16 +132,30 @@ def _sfx_gen():
 
 
 def audio_dur(path):
-    """אורך קובץ אודיו בשניות, או None אם אי אפשר לקרוא."""
-    try:
-        import imageio_ffmpeg
-        gen = imageio_ffmpeg.read_frames(path)
+    """
+    אורך קובץ אודיו בשניות, או None אם אי אפשר לקרוא.
+
+    read_frames של imageio-ffmpeg מיועד לווידאו ונופל על קובץ אודיו בלבד,
+    ולכן קוראים כאן את הפלט של ffmpeg עצמו.
+    """
+    if shutil.which("ffprobe"):
         try:
-            return float(next(gen)["duration"])
-        finally:
-            gen.close()
+            r = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                                "format=duration", "-of", "csv=p=0", path],
+                               capture_output=True, text=True, check=True)
+            return round(float(r.stdout.strip()), 2)
+        except Exception:
+            pass
+    try:
+        r = subprocess.run([FFMPEG, "-hide_banner", "-i", path],
+                           capture_output=True, text=True)
+        m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.?\d*)", r.stderr)
+        if m:
+            h, mi, s = m.groups()
+            return round(int(h) * 3600 + int(mi) * 60 + float(s), 2)
     except Exception:
-        return None
+        pass
+    return None
 
 
 @app.get("/api/audio")
