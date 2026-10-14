@@ -51,6 +51,33 @@ else
   source .venv/bin/activate
 fi
 
+# ── בדיקת ffmpeg ─────────────────────────────────────────────────────────
+# ב-macOS הבינארי שמגיע עם imageio-ffmpeg נהרג לפעמים על ידי המערכת
+# בגלל חתימה פגומה, וזה מתבטא בשגיאה "Could not load meta information"
+# על כל סרטון. חתימה מקומית פותרת, ולכן בודקים את זה בכל הפעלה.
+FF=$(python3 -c "import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())" 2>/dev/null)
+if [ -n "$FF" ] && ! "$FF" -version >/dev/null 2>&1; then
+  echo "  מתקן את החתימה של ffmpeg..."
+  xattr -cr "$FF" 2>/dev/null
+  codesign --force --sign - "$FF" >/dev/null 2>&1
+  chmod +x "$FF"
+  if "$FF" -version >/dev/null 2>&1; then
+    echo "  ffmpeg תקין ✓"
+  else
+    echo "  ✗ ffmpeg עדיין לא רץ. נסה: pip install --force-reinstall imageio-ffmpeg"
+    read -r -p "  Enter להמשך בכל זאת "
+  fi
+fi
+
+# ── שרת ישן שעדיין תופס את הפורט ─────────────────────────────────────────
+# בלי זה הדפדפן נפתח מול קוד ישן והתקלות נראות בלתי מוסברות.
+OLD=$(lsof -ti:8769 -sTCP:LISTEN 2>/dev/null)
+if [ -n "$OLD" ]; then
+  echo "  סוגר שרת קודם שרץ על הפורט..."
+  kill $OLD 2>/dev/null
+  sleep 1
+fi
+
 # ── הרצה ─────────────────────────────────────────────────────────────────
 echo "  פותח בדפדפן..."
 echo "  לעצירה: סגור את החלון או Ctrl+C"

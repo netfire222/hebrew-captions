@@ -24,7 +24,7 @@ os.makedirs(AUDIO, exist_ok=True)
 
 AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac", ".ogg")
 
-BUILD = "2026-09-16c"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
+BUILD = "2026-10-14a"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
 THEMES_FILE = os.path.join(ROOT, "themes.json")
 
 app = Flask(__name__, static_folder=None)
@@ -43,6 +43,27 @@ def _ffmpeg():
 
 
 FFMPEG = _ffmpeg()
+
+
+def ffmpeg_ok():
+    """
+    האם ffmpeg באמת רץ, ולא רק קיים כקובץ.
+
+    ב-macOS המערכת הורגת לפעמים את הבינארי שמגיע עם imageio-ffmpeg בגלל
+    חתימה פגומה. הקובץ נראה תקין לגמרי, אבל כל הרצה מסתיימת ב-SIGKILL,
+    וכל סרטון נראה פגום. בלי הבדיקה הזאת השגיאה מצביעה על הקובץ הלא נכון.
+    """
+    try:
+        r = subprocess.run([FFMPEG, "-version"], capture_output=True, timeout=20)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
+FFMPEG_HINT = ("ffmpeg לא מצליח לרוץ במחשב הזה, ולכן אי אפשר לקרוא שום "
+               "סרטון. סגור את הכלי והפעל שוב את start.command, שמתקן את "
+               "זה לבד. אם זה חוזר, הרץ בטרמינל: "
+               "pip install --force-reinstall imageio-ffmpeg")
 
 
 def probe(path):
@@ -115,6 +136,9 @@ def meta_for(name):
     try:
         m = probe(path)
     except Exception as e:
+        # אם ffmpeg עצמו לא רץ, הסרטון תקין והבעיה במחשב. להגיד את זה.
+        if not ffmpeg_ok():
+            return jsonify({"error": FFMPEG_HINT}), 500
         return jsonify({"error": f"קובץ וידאו לא תקין: {e}"}), 400
     m.update({"id": os.path.splitext(name)[0], "file": name})
     return jsonify(m)
@@ -389,6 +413,9 @@ def upload():
     try:
         meta = probe(path)
     except Exception as e:
+        # אם ffmpeg עצמו לא רץ, הסרטון תקין והבעיה במחשב. להגיד את זה.
+        if not ffmpeg_ok():
+            return jsonify({"error": FFMPEG_HINT}), 500
         return jsonify({"error": f"קובץ וידאו לא תקין: {e}"}), 400
     meta.update({"id": vid, "file": os.path.basename(path)})
     return jsonify(meta)
