@@ -26,7 +26,7 @@ os.makedirs(AUDIO, exist_ok=True)
 
 AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac", ".ogg")
 
-BUILD = "2026-11-13a"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
+BUILD = "2026-11-13b"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
 DATA = os.environ.get("HEBCAP_DATA", ROOT)   # בשרת זה volume
 os.makedirs(DATA, exist_ok=True)
 THEMES_FILE = os.path.join(DATA, "themes.json")
@@ -48,7 +48,10 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     # מאחורי HTTPS בלבד, אחרת הדפדפן לא ישמור את העוגייה מעל http מקומי
-    SESSION_COOKIE_SECURE=bool(PASSWORD),
+    # עוגייה מאובטחת נשלחת רק מעל HTTPS. זה מה שרוצים בשרת אמיתי,
+    # אבל מי שמריץ מאחורי פרוקסי משלו או ברשת מקומית יכול לכבות.
+    SESSION_COOKIE_SECURE=bool(PASSWORD) and
+                          os.environ.get("HEBCAP_COOKIE_SECURE", "1") != "0",
     PERMANENT_SESSION_LIFETIME=timedelta(days=30),
     MAX_CONTENT_LENGTH=600 * 1024 * 1024,     # סרטון עד 600 מגה
 )
@@ -81,9 +84,17 @@ def login():
         if hmac.compare_digest(given, PASSWORD):
             session.permanent = True
             session["ok"] = True
-            return redirect("/")
+            r = redirect("/")
+            # סמן לא רגיש, בלי Secure. אם הוא חוזר אלינו אבל ה-session לא,
+            # סימן שהעוגייה המאובטחת לא נשמרה, כלומר אנחנו על http.
+            # בלי זה המשתמש היה חוזר למסך הסיסמה בלי שום הסבר.
+            r.set_cookie("hc_try", "1", max_age=300, samesite="Lax")
+            return r
         time.sleep(1.0)          # מאט ניחושים אוטומטיים
         err = "סיסמה שגויה"
+    elif request.cookies.get("hc_try") and app.config["SESSION_COOKIE_SECURE"]:
+        err = ("הסיסמה התקבלה אבל הדפדפן לא שמר את ההתחברות. "
+               "כנראה נכנסת דרך http ולא https.")
     return Response(LOGIN_HTML.replace("{{err}}", err), mimetype="text/html")
 
 
