@@ -1,0 +1,21 @@
+# סביבה מקומית, לא רלוונטית לתמונה
+.venv/
+__pycache__/
+*.pyc
+
+# קבצים כבדים ואישיים. מגיעים מ-volume ולא מהתמונה.
+work/
+output/
+audio/
+
+# אישי, לא נכנס לשרת
+themes.json
+server.log
+nohup.out
+.DS_Store
+.git/
+
+# מקומי בלבד
+make_pack.py
+normalize_audio.py
+.env  # סיסמת השרת

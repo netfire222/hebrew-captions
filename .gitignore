@@ -19,3 +19,9 @@ server.log
 nohup.out
 
 .DS_Store
+
+# סיסמת השרת. לעולם לא לגיטהאב.
+.env
+
+# הגדרות מקומיות של הסביבה
+.claude/

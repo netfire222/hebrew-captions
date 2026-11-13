@@ -7,8 +7,10 @@
 התצוגה החיה רצה בדפדפן (מהיר, בלי רינדור), והייצוא הסופי רץ ב-PIL
 עם אותם פריסטים בדיוק, כדי שמה שרואים הוא מה שמקבלים.
 """
-import os, re, json, uuid, subprocess, shutil, tempfile, threading
-from flask import Flask, request, jsonify, send_from_directory, Response
+import os, re, json, uuid, time, hmac, hashlib, subprocess, shutil, tempfile, threading
+from datetime import timedelta
+from flask import (Flask, request, jsonify, send_from_directory, Response,
+                   session, redirect)
 
 import styles
 from caption_render import render_caption
@@ -24,11 +26,124 @@ os.makedirs(AUDIO, exist_ok=True)
 
 AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac", ".ogg")
 
-BUILD = "2026-10-14a"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
-THEMES_FILE = os.path.join(ROOT, "themes.json")
+BUILD = "2026-11-13a"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
+DATA = os.environ.get("HEBCAP_DATA", ROOT)   # בשרת זה volume
+os.makedirs(DATA, exist_ok=True)
+THEMES_FILE = os.path.join(DATA, "themes.json")
 
 app = Flask(__name__, static_folder=None)
 JOBS = {}
+
+
+# ── כניסה ────────────────────────────────────────────────────────────────
+# מקומית אין סיסמה ושום דבר לא משתנה. ברגע שמגדירים HEBCAP_PASSWORD,
+# כלומר כשהכלי יושב על שרת באינטרנט, הוא מבקש סיסמה לפני הכל.
+PASSWORD = os.environ.get("HEBCAP_PASSWORD", "").strip()
+
+# המפתח נגזר מהסיסמה, ולכן החלפת סיסמה מנתקת את כל המכשירים מאליה.
+# urandom כשאין סיסמה, כי אז אין גם מה להגן עליו.
+app.secret_key = (hashlib.sha256(("hebcap:" + PASSWORD).encode()).digest()
+                  if PASSWORD else os.urandom(32))
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    # מאחורי HTTPS בלבד, אחרת הדפדפן לא ישמור את העוגייה מעל http מקומי
+    SESSION_COOKIE_SECURE=bool(PASSWORD),
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+    MAX_CONTENT_LENGTH=600 * 1024 * 1024,     # סרטון עד 600 מגה
+)
+
+# מה מותר לפני כניסה. הבריאות נחוצה ל-docker, והאייקונים לדף הכניסה.
+OPEN_PATHS = {"/login", "/api/health", "/manifest.json", "/sw.js"}
+
+
+@app.before_request
+def require_login():
+    if not PASSWORD or request.path in OPEN_PATHS:
+        return None
+    if request.path.startswith("/static/"):
+        return None
+    if session.get("ok"):
+        return None
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "לא מחובר"}), 401
+    return redirect("/login")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if not PASSWORD:
+        return redirect("/")
+    err = ""
+    if request.method == "POST":
+        given = (request.form.get("pw") or "")
+        # compare_digest ולא ==, כדי שזמן התגובה לא יסגיר כמה תווים נכונים
+        if hmac.compare_digest(given, PASSWORD):
+            session.permanent = True
+            session["ok"] = True
+            return redirect("/")
+        time.sleep(1.0)          # מאט ניחושים אוטומטיים
+        err = "סיסמה שגויה"
+    return Response(LOGIN_HTML.replace("{{err}}", err), mimetype="text/html")
+
+
+@app.post("/api/logout")
+def logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/health")
+def health():
+    return jsonify({"ok": True, "build": BUILD})
+
+
+# ── התקנה כאפליקציה ──────────────────────────────────────────────────────
+# האייקונים והמניפסט פתוחים בכוונה, כי הדפדפן מושך אותם לפני הכניסה
+# וצריך אותם גם במסך הסיסמה.
+@app.get("/static/<path:name>")
+def static_file(name):
+    return send_from_directory(os.path.join(ROOT, "static"), name)
+
+
+@app.get("/manifest.json")
+def manifest():
+    return send_from_directory(os.path.join(ROOT, "static"), "manifest.json")
+
+
+@app.get("/sw.js")
+def service_worker():
+    r = send_from_directory(os.path.join(ROOT, "static"), "sw.js")
+    # בלי זה הדפדפן יכול להחזיק גרסה ישנה של ה-worker ימים
+    r.headers["Cache-Control"] = "no-cache"
+    return r
+
+
+LOGIN_HTML = """<!DOCTYPE html>
+<html lang="he" dir="rtl"><head><meta charset="utf-8">
+<title>כתוביות בעברית</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+ *{box-sizing:border-box;margin:0;padding:0}
+ body{background:#111009;color:#f0ebe3;font-family:Heebo,Arial,sans-serif;
+      display:flex;align-items:center;justify-content:center;height:100vh;padding:20px}
+ form{background:#1a1710;border:1px solid rgba(196,119,90,.25);border-radius:14px;
+      padding:30px;width:100%;max-width:340px;text-align:center}
+ h1{font-size:17px;color:#d4875a;margin-bottom:18px}
+ input{width:100%;background:#221f16;border:1px solid rgba(196,119,90,.25);
+       border-radius:8px;color:#f0ebe3;font-size:16px;padding:12px;text-align:center}
+ button{width:100%;margin-top:12px;background:#c4775a;color:#111;border:0;
+        border-radius:8px;padding:12px;font-size:14px;font-weight:700;
+        font-family:inherit;cursor:pointer}
+ .e{color:#e08b7a;font-size:12.5px;margin-top:10px;min-height:1em}
+</style></head><body>
+<form method="post">
+  <h1>כתוביות בעברית</h1>
+  <input type="password" name="pw" placeholder="סיסמה" autofocus
+         autocomplete="current-password">
+  <button type="submit">כניסה</button>
+  <div class="e">{{err}}</div>
+</form></body></html>"""
 
 
 # ── ffmpeg ───────────────────────────────────────────────────────────────

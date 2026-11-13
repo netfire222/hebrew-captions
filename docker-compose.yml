@@ -1,0 +1,49 @@
+# הרמת הכלי על שרת, עם HTTPS אמיתי ובלי להתעסק בתעודות.
+#
+# Caddy מוציא ומחדש תעודה מ-Let's Encrypt לבד, ברגע שהדומיין מצביע
+# לשרת. זו הסיבה שהוא כאן ולא nginx.
+#
+# הפעלה:  DOMAIN=x.example.com APP_PASSWORD=... docker compose up -d
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      # בלי סיסמה הכלי מסרב לעלות. הוא יהיה באינטרנט הפתוח.
+      HEBCAP_PASSWORD: ${APP_PASSWORD:?צריך להגדיר APP_PASSWORD}
+      # large-v3 מדויק אבל כבד. אם השרת חלש, שים small או medium.
+      HEBCAP_MODEL: ${WHISPER_MODEL:-large-v3}
+      HEBCAP_DATA: /data/app
+    volumes:
+      - work:/app/work          # סרטונים שהעלית
+      - output:/app/output      # ייצואים מוכנים
+      - audio:/app/audio        # ספריית האפקטים
+      - appdata:/data/app       # ערכות עיצוב ושאר נתונים קטנים
+      - hf:/data/hf             # מודל התמלול, כדי שלא יירד בכל הפעלה
+    expose:
+      - "8769"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?צריך להגדיר DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data         # התעודות. בלי זה כל restart מבקש חדשה.
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  work:
+  output:
+  audio:
+  appdata:
+  hf:
+  caddy_data:
+  caddy_config:

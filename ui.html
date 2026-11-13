@@ -3,6 +3,14 @@
 <head>
 <meta charset="utf-8">
 <title>כתוביות בעברית</title>
+<!-- viewport-fit=cover כדי שברקע לא יישאר פס לבן מתחת לסרגל של אייפון -->
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111009">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="כתוביות">
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   :root{--bg:#111009;--card:#1a1710;--card2:#221f16;--bd:rgba(196,119,90,.25);
@@ -95,6 +103,35 @@
   .err{color:#e08b7a}
   .bar{height:5px;background:var(--card2);border-radius:3px;overflow:hidden;margin-top:8px}
   .bar i{display:block;height:100%;background:var(--acc);width:0;transition:width .3s}
+
+  /* ── נייד ──────────────────────────────────────────────────────────────
+     הפריסה הרגילה היא שתי עמודות עם פאנל קבוע של 420 פיקסל, וזה רחב
+     יותר ממסך של טלפון. מתחת ל-900 עוברים לעמודה אחת: הסרטון למעלה
+     ודביק, הפקדים גוללים מתחתיו. ככה רואים את מה שמשנים תוך כדי. */
+  @media (max-width:900px){
+    body{grid-template-columns:1fr;height:auto;min-height:100vh;overflow:auto}
+    #stage{position:sticky;top:0;z-index:20;padding:10px;
+           height:46vh;background:#0a0908;
+           box-shadow:0 6px 24px rgba(0,0,0,.55)}
+    #wrap{max-height:100%;width:auto}
+    video{max-height:calc(46vh - 20px);width:auto;max-width:100%}
+    #panel{border-right:0;border-top:1px solid var(--bd);overflow:visible;
+           padding:16px 14px calc(26px + env(safe-area-inset-bottom))}
+    /* אצבע צריכה שטח גדול יותר מעכבר */
+    button{padding:13px 16px;font-size:14px}
+    select,input[type=number],input[type=text]{padding:11px;font-size:16px}
+    .row input[type=range]{height:22px}
+    .crow{padding:10px 8px}
+    .crow .del{opacity:1}          /* אין hover במגע */
+    .pcard .rm{opacity:1}
+    #caps,#fonts{max-height:260px}
+  }
+  /* מסך צר במיוחד: הפריסטים בעמודה אחת, אחרת הטקסט נחתך */
+  @media (max-width:420px){
+    .pgrid{grid-template-columns:1fr}
+    #stage{height:40vh}
+    video{max-height:calc(40vh - 20px)}
+  }
 </style>
 </head>
 <body>
@@ -271,7 +308,7 @@ const SWATCHES=['#FFFFFF','#FFD500','#FF3B30','#34C759','#0A84FF','#FF2D9B',
                 '#00E5FF','#FF9500','#AF52DE','#111009','#C4775A','#F0EBE3'];
 
 // ── טעינה ────────────────────────────────────────────────────────────────
-const UI_BUILD='2026-10-14a';
+const UI_BUILD='2026-11-13a';
 
 async function boot(){
   let p,f;
@@ -857,6 +894,27 @@ async function cleanup(scope){
 $('clnOld').onclick=()=>cleanup('old');
 $('clnAll').onclick=()=>cleanup('all');
 showStorage();
+
+// ── התקנה כאפליקציה ────────────────────────────────────────────────────
+// נרשם רק מעל HTTPS או ב-localhost, כי זו דרישה של הדפדפן. מקומית
+// בלי HTTPS פשוט לא קורה כלום, וזה תקין.
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
+
+// כפתור יציאה מופיע רק כשיש בכלל כניסה, כלומר כשהכלי על שרת
+fetch('/api/health').then(r=>r.json()).then(()=>{
+  if(!document.cookie.includes('session')) return;
+  const sec=document.createElement('div');
+  sec.className='sec';
+  sec.innerHTML='<button id="lg" style="background:none;border:1px solid var(--bd);'+
+                'color:var(--mut);font-size:12px">יציאה מהחשבון</button>';
+  $('panel').appendChild(sec);
+  $('lg').onclick=async()=>{
+    await fetch('/api/logout',{method:'POST'});
+    location.href='/login';
+  };
+}).catch(()=>{});
 </script>
 </body>
 </html>

@@ -1,0 +1,8 @@
+flask>=3.0
+gunicorn>=21.2
+Pillow>=10.0
+faster-whisper>=1.0
+requests>=2.31
+# imageio-ffmpeg הוא גיבוי בלבד. בדוקר ffmpeg מגיע מהמערכת,
+# והכלי מעדיף אותו ממילא.
+imageio-ffmpeg>=0.4.9

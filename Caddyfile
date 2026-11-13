@@ -1,0 +1,33 @@
+# תעודת HTTPS אוטומטית מ-Let's Encrypt, מתחדשת לבד.
+
+{$DOMAIN} {
+	# סרטונים הם קבצים גדולים. בלי זה כל העלאה מעל 10 מגה נדחית.
+	request_body {
+		max_size 500MB
+	}
+
+	# ייצוא לוקח דקות, ובזמן הזה הדפדפן מושך סטטוס. בלי הארכה כאן
+	# Caddy חותך את החיבור באמצע והממשק נראה תקוע.
+	reverse_proxy app:8769 {
+		transport http {
+			read_timeout 1h
+			write_timeout 1h
+		}
+	}
+
+	encode gzip
+
+	header {
+		# הכלי מגיש רק את עצמו, אין סיבה שאתר אחר יטמיע אותו
+		X-Frame-Options "SAMEORIGIN"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+	}
+
+	log {
+		output file /data/access.log {
+			roll_size 10MB
+			roll_keep 3
+		}
+	}
+}
