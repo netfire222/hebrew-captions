@@ -26,7 +26,7 @@ os.makedirs(AUDIO, exist_ok=True)
 
 AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac", ".ogg")
 
-BUILD = "2026-11-13b"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
+BUILD = "2026-11-17a"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
 DATA = os.environ.get("HEBCAP_DATA", ROOT)   # בשרת זה volume
 os.makedirs(DATA, exist_ok=True)
 THEMES_FILE = os.path.join(DATA, "themes.json")

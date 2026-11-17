@@ -27,7 +27,8 @@
   #capInner{position:absolute;text-align:center;transform:translate(-50%,-50%);
             white-space:normal;pointer-events:auto;cursor:grab;user-select:none}
   #capInner.drag{cursor:grabbing}
-  #capInner .w{display:inline-block;margin:0 .16em}
+  #capInner .w{display:inline-block;margin:0 .16em;transform-origin:center center;
+               will-change:transform}
   #guide{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;transition:opacity .15s}
   #guide.on{opacity:1}
   #guide i{position:absolute;background:rgba(196,119,90,.5)}
@@ -296,6 +297,9 @@
 
 <script>
 let META=null, CAPS=[], PRESETS={}, FONTS=[], PKEY='pop_yellow', MODE='auto', LAST=-1;
+// מצב הציור של הכתובית. SIG היא החתימה של מה שמצויר כרגע,
+// WORDS_EL הספאנים עצמם ו-ACT המילה הפעילה האחרונה.
+let SIG='', WORDS_EL=[], ACT;
 let THEMES={}, TKEY=null;      // ערכות ששמרת בעצמך, ואיזו מהן פעילה
 // כתובית דוגמה, כדי שאפשר יהיה לעצב לפני שמתמללים
 const SAMPLE={words:['חוסך','30%','מהזמן','עם','/fork'],
@@ -308,7 +312,7 @@ const SWATCHES=['#FFFFFF','#FFD500','#FF3B30','#34C759','#0A84FF','#FF2D9B',
                 '#00E5FF','#FF9500','#AF52DE','#111009','#C4775A','#F0EBE3'];
 
 // ── טעינה ────────────────────────────────────────────────────────────────
-const UI_BUILD='2026-11-13b';
+const UI_BUILD='2026-11-17a';
 
 async function boot(){
   let p,f;
@@ -694,25 +698,55 @@ function tick(){
 
   const sw=fs*(STYLE.stroke_pct||0)/10;
   const sh=STYLE.shadow||{};
-  box.innerHTML=cap.words.map((word,k)=>{
-    const on=k===ai, em=cap.emph&&cap.emph[k];
-    let st=`color:${(on||em)?STYLE.active_color:STYLE.color};`;
-    st+=`transform:scale(${on?STYLE.active_scale:1});`;
-    // CSS מוסיף ריווח גם אחרי האות האחרונה, ואז המילה יוצאת מוסטת.
-    // מקזזים אותו בקצה של המילה כדי שהמרכוז יישאר נכון.
-    if(trk) st+=`margin-inline-end:${(0.16*fs-trk).toFixed(2)}px;`;
-    if(STYLE.stroke_on) st+=`-webkit-text-stroke:${sw}px ${STYLE.stroke_color};paint-order:stroke fill;`;
-    if(STYLE.shadow_on) st+=`text-shadow:0 ${fs*(sh.dy_pct||.1)}px ${fs*(sh.blur_pct||.3)}px `
-      +`${hexA(STYLE.shadow_color||'#000', STYLE.shadow_opacity)};`;
-    return `<span class="w" style="${st}">${word}</span>`;
-  }).join('');
 
-  if(cap.sample) box.style.opacity='.75'; else box.style.opacity='1';
-  if(STYLE.bg){
-    const b=STYLE.bg;
-    box.innerHTML=`<span style="background:${b.color};border-radius:${fs*b.radius_pct}px;`
-      +`padding:${fs*b.pad_y_pct}px ${fs*b.pad_x_pct}px;`
-      +`box-decoration-break:clone;-webkit-box-decoration-break:clone;">`+box.innerHTML+`</span>`;
+  // חתימה של כל מה שמשפיע על מבנה השורה.
+  //
+  // קודם בנינו כאן את כל ה-HTML מחדש בכל פריים, שישים פעם בשנייה.
+  // הדפדפן עיצב את העברית מחדש כל פעם, ועם ריווח אותיות ושוליים
+  // שבריריים העיגול יצא קצת אחרת בכל פעם. זה מה שנראה כמו הבהוב
+  // וזחילה של השורה. עכשיו בונים מחדש רק כשמשהו באמת השתנה.
+  const sig=[cap.words.join('\u0001'), (cap.emph||[]).join(','), fs, trk, sw,
+             STYLE.color, STYLE.active_color, STYLE.active_scale,
+             STYLE.stroke_on, STYLE.stroke_color, STYLE.shadow_on,
+             STYLE.shadow_color, STYLE.shadow_opacity, STYLE.line_height,
+             STYLE.font_file, JSON.stringify(STYLE.bg||null), cap.sample?1:0
+            ].join('|');
+
+  if(sig!==SIG){
+    SIG=sig;
+    const html=cap.words.map((word,k)=>{
+      let st='';
+      // CSS מוסיף ריווח גם אחרי האות האחרונה, ואז המילה יוצאת מוסטת.
+      // מקזזים אותו בקצה של המילה כדי שהמרכוז יישאר נכון.
+      if(trk) st+=`margin-inline-end:${(0.16*fs-trk).toFixed(2)}px;`;
+      if(STYLE.stroke_on) st+=`-webkit-text-stroke:${sw}px ${STYLE.stroke_color};paint-order:stroke fill;`;
+      if(STYLE.shadow_on) st+=`text-shadow:0 ${fs*(sh.dy_pct||.1)}px ${fs*(sh.blur_pct||.3)}px `
+        +`${hexA(STYLE.shadow_color||'#000', STYLE.shadow_opacity)};`;
+      const em=cap.emph&&cap.emph[k]?' data-em="1"':'';
+      return `<span class="w"${em} style="${st}">${word}</span>`;
+    }).join('');
+    if(STYLE.bg){
+      const b=STYLE.bg;
+      box.innerHTML=`<span style="background:${b.color};border-radius:${fs*b.radius_pct}px;`
+        +`padding:${fs*b.pad_y_pct}px ${fs*b.pad_x_pct}px;`
+        +`box-decoration-break:clone;-webkit-box-decoration-break:clone;">`+html+`</span>`;
+    } else {
+      box.innerHTML=html;
+    }
+    WORDS_EL=Array.from(box.querySelectorAll('.w'));
+    ACT=undefined;                       // מכריח רענון של המילה הפעילה
+    box.style.opacity = cap.sample ? '.75' : '1';
+  }
+
+  // מעבר בין מילים נוגע רק בצבע ובהגדלה של הספאנים הקיימים.
+  // scale הוא transform ולכן הוא לא משנה פריסה, והשכנות לא זזות.
+  if(ai!==ACT){
+    ACT=ai;
+    for(let k=0;k<WORDS_EL.length;k++){
+      const el=WORDS_EL[k], on=k===ai, em=el.dataset.em==='1';
+      el.style.color=(on||em)?STYLE.active_color:STYLE.color;
+      el.style.transform=on?`scale(${STYLE.active_scale})`:'';
+    }
   }
 }
 function hexA(hex,a){

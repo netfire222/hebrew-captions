@@ -269,19 +269,26 @@ def render_caption(size, words, active_idx, preset, font_stack, emph=None):
 
     li_off = 0
     for li, lw in enumerate(lines):
-        # איזה פונט כל מילה בשורה הזו תצויר בו
-        lfonts = [big if (active_idx is not None and (li_off + j) == active_idx
-                          and preset.get("active_scale", 1) != 1) else font
-                  for j in range(len(lw))]
-        placed, tot = layout_words(lw, font, space_w, fonts=lfonts, tracking_pct=trk_pct)
+        # הפריסה נמדדת תמיד בגודל הבסיס, גם כשהמילה הפעילה מצוירת גדולה
+        # יותר. קודם היא נמדדה בגודל המוגדל, ואז רוחב השורה השתנה בכל
+        # מעבר בין מילים, המרכוז זז, וכל השורה קפצה ימינה ושמאלה לאורך
+        # כל הסרטון. עכשיו המשבצות קבועות וההגדלה מצוירת סביב מרכז
+        # המילה עצמה, ולכן רק היא גדלה והשכנות לא זזות.
+        placed, tot = layout_words(lw, font, space_w, tracking_pct=trk_pct)
         ox = _ox(tot)
         base_y = top + li * lh
         for j, (word, x, ww) in enumerate(placed):
             is_active = (active_idx is not None and idx == active_idx)
-            f = lfonts[j]
+            grow = is_active and preset.get("active_scale", 1) != 1
+            f = big if grow else font
             wt = f.size * trk_pct / 100
             wx = ox + x
-            wy = base_y - (f.size - font.size) * 0.5
+            wy = base_y
+            if grow:
+                # מרכזים את המילה המוגדלת על המשבצת של הגודל הרגיל,
+                # אופקית ואנכית, כדי שהיא תגדל מהמרכז שלה החוצה
+                wx -= (measure(word, f, wt) - ww) / 2
+                wy -= (f.size - font.size) * 0.5
             is_emph = bool(emph and idx < len(emph) and emph[idx])
             col = _hex(preset["active_color"] if (is_active or is_emph) else preset["color"])
 
