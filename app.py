@@ -26,7 +26,7 @@ os.makedirs(AUDIO, exist_ok=True)
 
 AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac", ".ogg")
 
-BUILD = "2026-11-17a"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
+BUILD = "2026-11-17b"      # מזהה גרסה, כדי לזהות שרת שרץ עם קוד ישן
 DATA = os.environ.get("HEBCAP_DATA", ROOT)   # בשרת זה volume
 os.makedirs(DATA, exist_ok=True)
 THEMES_FILE = os.path.join(DATA, "themes.json")
@@ -580,8 +580,21 @@ def build_states(captions, fps, dur):
     מצב = כתובית מסוימת עם מילה מודגשת מסוימת.
     """
     states = []
-    for c in captions:
-        for i, (s, e) in enumerate(c["times"]):
+    caps = sorted(captions, key=lambda c: c["times"][0][0] if c.get("times") else 0)
+    for ci, c in enumerate(caps):
+        times = c.get("times") or []
+        # סוף הכתובית: הזמן שלה, ואם הכתובית הבאה מתחילה פחות מ-0.35
+        # שנייה אחריה, מגשרים עד אליה כדי שלא יהבהב פריים ריק בין כתוביות
+        cap_end = c.get("e", times[-1][1] if times else 0)
+        if ci + 1 < len(caps) and caps[ci + 1].get("times"):
+            nxt = caps[ci + 1]["times"][0][0]
+            if 0 <= nxt - cap_end < 0.35:
+                cap_end = nxt
+        for i, (s, e) in enumerate(times):
+            # בתמלול יש רווחים קטנים בין מילה למילה. קודם הם יצאו בייצוא
+            # כפריימים ריקים, והכתובית הבהבה בין כל שתי מילים. עכשיו כל
+            # מילה נשארת פעילה עד שהבאה מתחילה, בדיוק כמו בתצוגה בכלי.
+            e = max(e, times[i + 1][0]) if i + 1 < len(times) else max(e, cap_end)
             f0, f1 = int(round(s * fps)), int(round(e * fps))
             if f1 <= f0:
                 f1 = f0 + 1

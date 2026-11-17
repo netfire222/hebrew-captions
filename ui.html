@@ -312,7 +312,7 @@ const SWATCHES=['#FFFFFF','#FFD500','#FF3B30','#34C759','#0A84FF','#FF2D9B',
                 '#00E5FF','#FF9500','#AF52DE','#111009','#C4775A','#F0EBE3'];
 
 // ── טעינה ────────────────────────────────────────────────────────────────
-const UI_BUILD='2026-11-17a';
+const UI_BUILD='2026-11-17b';
 
 async function boot(){
   let p,f;
@@ -666,8 +666,9 @@ function tick(){
   for(let i=0;i<CAPS.length;i++){
     const c=CAPS[i];
     if(t>=c.s&&t<=c.e){cap=c;ci=i;
+      // ברווח בין מילים המילה הקודמת נשארת פעילה, בדיוק כמו בייצוא
       for(let k=0;k<c.times.length;k++)
-        if(t>=c.times[k][0]&&t<=c.times[k][1]){ai=k;break}
+        if(t>=c.times[k][0]) ai=k;
       break}
   }
   if(ci!==LAST){
